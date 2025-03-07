@@ -8,19 +8,26 @@ then
    echo "Script removes SNPs with duplicate positions, removes"
    echo "strand ambiguous SNPs, and performs pre-imputation QC."
    echo "Uses mix of PLINK2 & PLINK1.9 (with --keep-allele-order)"
-   echo "based on command availability. Crossover is from hg19 to"
-   echo "hg38. If "chr" input = "all" then the script will create"
-   echo "one VCF file per chr. Otherwise, must be a single chr"
-   echo "number '1', '2', etc. Option to use HWE filter 1e-20 for"
-   echo "chr6 MHC instead of 1e-6."
+   echo "based on command availability. Crossover is hg19 to hg38"
+   echo "or hg38 to hg19. If "chr" input = "all" then the script"
+   echo "will create one VCF file per chr. Otherwise, must be a"
+   echo "single chr number '1', '2', etc. Fifth argument is build"
+   echo "of input data, should be "hg19" or "hg38". Option to use"
+   echo "HWE filter 1e-20 for chr6 MHC instead of 1e-6, add by"
+   echo "setting optional 6th argument to "hwe"."
    exit
 fi
+
+# TODO: need to update to make all out dirs
 
 plink_prefix=$1
 out_dir=$2
 code_dir=$3
 chr=$4
-chr6_hwe_diff=$5  # should be "yes" or "no"
+build=$5 # should be "hg19" or "hg38"
+if [ -n "$6" ]; then
+      chr6_hwe=$6  # should be "hwe" or just not given
+fi
 
 # If plink_prefix is in PLINK2 format, convert to PLINK1.9
 if [ ! -f "$plink_prefix".fam ]
@@ -31,6 +38,8 @@ then
             --make-bed \
             --out "$plink_prefix"
 fi
+
+mkdir "$out_dir"
 
 # Remove SNPs with duplicate positions
 plink --bfile $plink_prefix \
@@ -57,7 +66,10 @@ paste  ${out_dir}/tmp_c1.txt \
        >  ${out_dir}/tmp_in.bed
 
 # Do crossover
-CrossMap.py bed ${code_dir}/hg19ToHg38.over.chain \
+build_num=$(echo "$build" | grep -o '[0-9]\+')
+[[ "$build_num" == "19" ]] && to_build_num="38" || to_build_num="19"
+
+CrossMap.py bed ${code_dir}/hg${build_num}ToHg${to_build_num}.over.chain \
    ${out_dir}/tmp_in.bed  \
    ${out_dir}/tmp_out.bed
 
@@ -90,8 +102,7 @@ plink2 --bfile ${out_dir}/tmp_gwas_no_AT_CG \
 # Note that the encoding for chromosome is e.g. chr22, not 22
 
 # If all chromosomes/regions should have same HWE
-if [ "$chr6_hwe_diff" != "yes" ]
-then
+if [ -z "$chr6_hwe" ]; then
    plink2 --pfile ${out_dir}/tmp_gwas_no_AT_CG_chrpos_ids \
       --maf 0.000001 --geno 0.05 --hwe 0.000001 \
       --make-bed --out ${out_dir}/pre_qc
@@ -103,27 +114,40 @@ then
          plink --bfile ${out_dir}/pre_qc \
             --chr $chr_num --keep-allele-order \
             --recode vcf --out ${out_dir}/tmp_chr${chr_num}
-         vcf-sort ${out_dir}/tmp_chr${chr_num}.vcf | \
-            sed -E 's/^([[:digit:]]+)/chr\1/' | \
-            bgzip -c > ${out_dir}/chr${chr_num}_pre_qc.vcf.gz
+         if [ "$to_build_num" == "38" ]; then
+            vcf-sort ${out_dir}/tmp_chr${chr_num}.vcf | \
+               sed -E 's/^([0-9XYM]+)/chr\1/' | \
+               bgzip -c > ${out_dir}/chr${chr_num}_pre_qc.vcf.gz
+         else
+               vcf-sort ${out_dir}/tmp_chr${chr_num}.vcf | \
+               sed -E 's/^chr([0-9XYM]+)/\1/' | \
+               bgzip -c > ${out_dir}/chr${chr_num}_pre_qc.vcf.gz
+         fi
       done
    # If preparing only one chromosome
    else
       plink --bfile ${out_dir}/pre_qc \
             --chr $chr --keep-allele-order \
             --recode vcf --out ${out_dir}/tmp_chr${chr}
-      vcf-sort ${out_dir}/tmp_chr${chr}.vcf | \
-            sed -E 's/^([[:digit:]]+)/chr\1/' | \
+      if [ "$to_build_num" == "38" ]; then
+         vcf-sort ${out_dir}/tmp_chr${chr}.vcf | \
+            sed -E 's/^([0-9XYM]+)/chr\1/' | \
             bgzip -c > ${out_dir}/chr${chr}_pre_qc.vcf.gz
+      else
+         vcf-sort ${out_dir}/tmp_chr${chr}.vcf | \
+            sed -E 's/^chr([0-9XYM]+)/\1/' | \
+            bgzip -c > ${out_dir}/chr${chr}_pre_qc.vcf.gz
+      fi
    fi
 # If chromosome 6 MHC region should have different HWE
-elif [ "$chr6_hwe_diff" == "yes" ]
-then
+else
    echo "Using HWE 1e-20 for chr6, 1e-6 for all other chr."
    # Get chr6 MHC region from Paul Norman's coordinates
-   # (GRCh38/hg38) Chr 6:28,510,120-33532223
+   start=$(head -n 1 ${code_dir}/mhc_extended_${build}.bed | awk -F':' '{gsub(/-.*/, "", $2); print $2}')
+   stop=$(tail -n 1 ${code_dir}/mhc_extended_${build}.bed | awk -F':' '{gsub(/-.*/, "", $2); print $2}')
+
    plink2 --pfile ${out_dir}/tmp_gwas_no_AT_CG_chrpos_ids --chr 6 \
-      --from-bp 28510120 --to-bp 33532223 \
+      --from-bp $start --to-bp $stop \
       --make-pgen --out ${out_dir}/tmp_mhc
 
    # Get all chr6 SNPs not in region
@@ -167,22 +191,38 @@ then
          plink --bfile ${out_dir}/pre_qc \
             --chr $chr_num --keep-allele-order \
             --recode vcf --out ${out_dir}/tmp_chr${chr_num}
-         vcf-sort ${out_dir}/tmp_chr${chr_num}.vcf | \
-            sed -E 's/^([[:digit:]]+)/chr\1/' | \
-            bgzip -c > ${out_dir}/chr${chr_num}_pre_qc.vcf.gz
+         if [ "$to_build_num" == "38" ]; then
+            vcf-sort ${out_dir}/tmp_chr${chr_num}.vcf | \
+               sed -E 's/^([0-9XYM]+)/chr\1/' | \
+               bgzip -c > ${out_dir}/chr${chr_num}_pre_qc.vcf.gz
+         else
+            vcf-sort ${out_dir}/tmp_chr${chr_num}.vcf | \
+               sed -E 's/^chr([0-9XYM]+)/\1/' | \
+               bgzip -c > ${out_dir}/chr${chr_num}_pre_qc.vcf.gz
+         fi
 
       done
    # If preparing only chr6
    else
+      # Need to write out pre_qc for next pipeline step
       plink --bfile ${out_dir}/chr6_pre_qc \
+         --keep-allele-order \
+         --make-bed --out ${out_dir}/pre_qc
+
+      plink --bfile ${out_dir}/pre_qc \
          --chr $chr --keep-allele-order \
          --recode vcf --out ${out_dir}/tmp_chr${chr}
-      vcf-sort ${out_dir}/tmp_chr${chr}.vcf | \
-         sed -E 's/^([[:digit:]]+)/chr\1/' | \
-         bgzip -c > ${out_dir}/chr${chr}_pre_qc.vcf.gz
+
+      if [ "$to_build_num" == "38" ]; then
+         vcf-sort ${out_dir}/tmp_chr${chr}.vcf | \
+            sed -E 's/^([0-9XYM]+)/chr\1/' | \
+            bgzip -c > ${out_dir}/chr${chr}_pre_qc.vcf.gz
+      else
+         vcf-sort ${out_dir}/tmp_chr${chr}.vcf | \
+            sed -E 's/^chr([0-9XYM]+)/\1/' | \
+            bgzip -c > ${out_dir}/chr${chr}_pre_qc.vcf.gz
       fi
-else 
-   echo "Incorrect flag given for chr6 HWE option."
+   fi
 fi
 
 # Report SNP counts
@@ -196,7 +236,7 @@ echo "Original SNP nr: $orig_snp_nr" > ${out_dir}/create_initial_input_log.txt
 echo "Crossovered SNP nr: $crossover_snp_nr" >> ${out_dir}/create_initial_input_log.txt
 echo "Non-ambiguous SNP nr: $nonamb_snp_nr" >> ${out_dir}/create_initial_input_log.txt
 
-if [ "$chr6_hwe_diff" != "yes" ]
+if [ -z "$chr6_hwe" ]
 then
    qc_snp_nr=`wc -l ${out_dir}/pre_qc.bim`
    echo "Final SNP nr after QC: $qc_snp_nr"
