@@ -11,17 +11,24 @@ print("where one has an allele mismatch, both variants are")
 print("removed due to inability to identify which of the")
 print("pair is correct.")
 
-get_strand_flip_snp_names <- function(pre_qc_dir, post_qc_dir) {
+get_strand_flip_snp_names <- function(pre_qc_dir, post_qc_dir, imp_server) {
   # Load snp-excluded.txt
   snp.excl <- read.delim(paste0(pre_qc_dir, "/snps-excluded.txt"),
                          stringsAsFactors = F)
   
   # Add column with chr:pos for all variants
-  snp.excl$chr <- as.numeric(
-    gsub("chr", "", unlist(strsplit(snp.excl$X.Position, split=":"))[seq(1,dim(snp.excl)[1]*4,4)]))
-  snp.excl$pos <- as.numeric(
-    unlist(strsplit(snp.excl$X.Position, split=":"))[seq(2,dim(snp.excl)[1]*4,4)])
-  snp.excl$chr.pos <- paste0(snp.excl$chr, ":", snp.excl$pos)
+  if (imp_server == "tm") {
+    snp.excl$chr <- as.numeric(
+      gsub("chr", "", unlist(strsplit(snp.excl$X.Position, split=":"))[seq(1,dim(snp.excl)[1]*4,4)]))
+    snp.excl$pos <- as.numeric(
+      unlist(strsplit(snp.excl$X.Position, split=":"))[seq(2,dim(snp.excl)[1]*4,4)])
+    snp.excl$chr.pos <- paste0(snp.excl$chr, ":", snp.excl$pos)
+  } else if (imp_server == "mich") {
+    snp.excl$chr.pos <- paste0(snp.excl$CHROM, ":", snp.excl$POS)
+    snp.excl$FilterType <- snp.excl$INFO  # copy to same col name as tm
+    snp.excl$Info <- snp.excl$INFO  # copy to same col name as tm
+    snp.excl$ref <- snp.excl$REF  # copy to same col name as tm
+  }
   
   # Load bim so can get actual varID names
   bim <- read.table(paste0(pre_qc_dir, "/pre_qc.bim"),
@@ -51,7 +58,7 @@ get_strand_flip_snp_names <- function(pre_qc_dir, post_qc_dir) {
     # Get ref alleles for strand flip and allele switch
     snp.frame.flip.as.both <- snp.frame.flip.as[grep("Strand flip and Allele switch", snp.frame.flip.as$FilterType),]
     snp.frame.flip.as.both$ref <- gsub("/[[:alpha:]]", "",
-                               gsub("[[:alpha:]]+:", "", snp.frame.flip.as.both$Info))
+                               gsub(".*:", "", snp.frame.flip.as.both$Info))
     
     # Get varID name with reference a2 allele for PLINK --a2-allele
     snp.frame.flip.as.both <- snp.frame.flip.as.both[,c("V2", "ref")]
@@ -75,7 +82,7 @@ get_strand_flip_snp_names <- function(pre_qc_dir, post_qc_dir) {
   ### Handle allele switches only
   # Get ref alleles for strand flip and allele switch
   snp.frame.as$ref <- gsub("/[[:alpha:]]", "",
-                           gsub("[[:alpha:]]+:", "", snp.frame.as$Info))
+                           gsub(".*:", "", snp.frame.as$Info))
   
   # Get varID name with reference a2 allele for PLINK --a2-allele
   snp.frame.as <- snp.frame.as[,c("V2", "ref")]
@@ -87,4 +94,4 @@ get_strand_flip_snp_names <- function(pre_qc_dir, post_qc_dir) {
   
 }
 
-get_strand_flip_snp_names(args[1], args[2])
+get_strand_flip_snp_names(args[1], args[2], args[3])

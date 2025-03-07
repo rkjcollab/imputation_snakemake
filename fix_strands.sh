@@ -1,14 +1,14 @@
 #!/bin/bash
 
 #Set arguments
-if [ "$#" -eq  "0" ]
+if [ "$#" -lt  6 ]
 then
-    echo "Usage: ${0##*/} <pre_qc_dir> <post_qc_dir> <code_dir> <chr>"
+    echo "Usage: ${0##*/} <pre_qc_dir> <post_qc_dir> <code_dir> <chr> <imp_server>"
     echo "Script uses output from TOPMed pre-imputation QC to fix strand"
     echo "flips. If "chr" input = "all", then the script will create one"
     echo "VCF file per chr. Otherwise, must be a single chr number '1',"
-    echo "'2', etc. Crossover is from hg19 to hg38, this script should"
-    echo "follow create_initial_input (with or without crossover)."
+    echo "'2', etc. This script should follow create_initial_input (with"
+    echo "or without crossover)."
     exit
 fi
 
@@ -16,13 +16,17 @@ pre_qc_dir=$1
 post_qc_dir=$2
 code_dir=$3
 chr=$4
+build=$5  # should be "hg19" or "hg38"
+imp_server=$6  # should be "mich" or "tm"
+# TODO: should I just maintain separate repo for Michigan pipelines?
+# TODO: need to update to make all out dirs
 
+mkdir "$post_qc_dir"
 
 #Get list of SNPs to flip
-Rscript --vanilla ${code_dir}/get_strand_flip_snp_names.R $pre_qc_dir $post_qc_dir
+Rscript --vanilla ${code_dir}/get_strand_flip_snp_names.R $pre_qc_dir $post_qc_dir $imp_server
 
 #Create vcf files for uploading to imputation server for QC
-#Note that the encoding for chromosome is e.g. chr22, not 22
 process_chr() {
     chr=$1
 
@@ -31,7 +35,7 @@ process_chr() {
         --flip ${post_qc_dir}/tmp_flip.txt \
         --chr $chr --make-bed --keep-allele-order \
         --out ${post_qc_dir}/tmp_chr${chr}_flip
-    # Fix allele switches after slip
+    # Fix allele switches after flip
     plink --bfile ${post_qc_dir}/tmp_chr${chr}_flip \
         --a2-allele ${post_qc_dir}/tmp_a2-allele.txt \
         --chr $chr --make-bed --keep-allele-order \
@@ -41,10 +45,15 @@ process_chr() {
         --a2-allele ${post_qc_dir}/tmp_a2-allele_switch_only.txt \
         --chr $chr --recode vcf --keep-allele-order \
         --out ${post_qc_dir}/tmp_chr${chr}_flip_switch_both
-
-    vcf-sort ${post_qc_dir}/tmp_chr${chr}_flip_switch_both.vcf | \
-        sed -E 's/^([[:digit:]]+)/chr\1/' | \
-        bgzip -c > ${post_qc_dir}/chr${chr}_post_qc.vcf.gz
+    if [ "$build" == "hg38" ]; then
+        vcf-sort ${post_qc_dir}/tmp_chr${chr}_flip_switch_both.vcf | \
+            sed -E 's/^([0-9XYM]+)/chr\1/' | \
+            bgzip -c > ${post_qc_dir}/chr${chr}_post_qc.vcf.gz
+    elif [ "$build" == "hg19" ]; then
+        vcf-sort ${post_qc_dir}/tmp_chr${chr}_flip_switch_both.vcf | \
+            sed -E 's/^chr([0-9XYM]+)/\1/' | \
+            bgzip -c > ${post_qc_dir}/chr${chr}_post_qc.vcf.gz
+    fi
 }
 
 # If chr = "all", then create one VCF file per chr, otherwise
