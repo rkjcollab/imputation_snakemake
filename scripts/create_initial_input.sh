@@ -1,22 +1,27 @@
 #!/bin/bash
 
-# set -e
+set -e
 set -u
 
-# Added getopts based on Sam's example: https://github.com/pozdeyevlab/gnomad-query/blob/main/bcftools_query.sh
-while getopts p:o:c:n:b:h:t: opt; do
+# Added getopts based on Sam's example:
+# https://github.com/pozdeyevlab/gnomad-query/blob/main/bcftools_query.sh
+while getopts p:o:c:b:t: opt; do
    case "${opt}" in
       p) plink_prefix=${OPTARG};;
       o) out_dir=${OPTARG};;
-      c) code_dir=${OPTARG};;
-      n) chr=${OPTARG};;
+      c) chr=${OPTARG};;
       b) orig_build=${OPTARG};;
       t) to_build=${OPTARG};;
-      h) chr6_hwe=${OPTARG};;
       \?) echo "Invalid option -$OPTARG" >&2
       exit 1;;
    esac
 done
+
+# Code paths here are relative, assuming run from location of snakefile.
+# Current code ALWAYS applies less strict HWE for chr6.
+
+# Convert to array
+chr=($chr)
 
 # Remove SNPs with duplicate positions
 plink --bfile $plink_prefix \
@@ -50,7 +55,7 @@ if [ "$orig_build_num" != "$to_build_num" ]; then
          ${out_dir}/tmp_c4.txt \
          >  ${out_dir}/tmp_in.bed
 
-   CrossMap bed ${code_dir}/hg${build_num}ToHg${to_build_num}.over.chain \
+   CrossMap bed refs/hg${orig_build_num}ToHg${to_build_num}.over.chain \
       ${out_dir}/tmp_in.bed  \
       ${out_dir}/tmp_out.bed
 
@@ -62,7 +67,7 @@ if [ "$orig_build_num" != "$to_build_num" ]; then
       --make-bed --out ${out_dir}/tmp_gwas
 
    # Update bim file positions
-   Rscript --vanilla ${code_dir}/update_pos.R \
+   Rscript --vanilla scripts/update_pos.R \
    ${out_dir}/tmp_out.bed ${out_dir}/tmp_gwas.bim
 
 else 
@@ -73,7 +78,7 @@ else
 fi
 
 # Remove strand ambiguous SNPs
-Rscript --vanilla ${code_dir}/get_strand_amb_SNPs.R ${out_dir}/tmp_no_dupl.bim
+Rscript --vanilla scripts/get_strand_amb_SNPs.R ${out_dir}/tmp_no_dupl.bim
 plink --bfile ${out_dir}/tmp_gwas \
    --exclude ${out_dir}/tmp_strand_remove_snps.txt \
    --keep-allele-order \
@@ -86,56 +91,13 @@ plink2 --bfile ${out_dir}/tmp_gwas_no_AT_CG \
 
 # Perform pre-imputation QC - remove monomorphic SNPs, SNPs with high
 # missingness, SNPs not in HWE, & then reate vcf files for uploading
-# to imputation server for QC
-# Note that the encoding for chromosome is e.g. chr22, not 22
-
-# If all chromosomes/regions should have same HWE
-# if [ "$chr6_hwe" != "yes" ]; then
-#    plink2 --pfile ${out_dir}/tmp_gwas_no_AT_CG_chrpos_ids \
-#       --maf 0.000001 --geno 0.05 --hwe 0.000001 \
-#       --make-bed --out ${out_dir}/pre_qc
-
-#    # If preparing all chromosomes
-#    if [ "$chr" == "all" ]
-#    then
-#       for ((chr_num=1; chr_num<=22; chr_num++)); do
-#          plink --bfile ${out_dir}/pre_qc \
-#             --chr $chr_num --keep-allele-order \
-#             --recode vcf --out ${out_dir}/tmp_chr${chr_num}
-#          if [ "$to_build_num" == "38" ]; then
-#             vcf-sort ${out_dir}/tmp_chr${chr_num}.vcf | \
-#                sed -E 's/^([0-9XYM]+)/chr\1/' | \
-#                bgzip -c > ${out_dir}/chr${chr_num}_pre_qc.vcf.gz
-#          else
-#                vcf-sort ${out_dir}/tmp_chr${chr_num}.vcf | \
-#                sed -E 's/^chr([0-9XYM]+)/\1/' | \
-#                bgzip -c > ${out_dir}/chr${chr_num}_pre_qc.vcf.gz
-#          fi
-#       done
-#    # If preparing only one chromosome
-#    else
-#       plink --bfile ${out_dir}/pre_qc \
-#             --chr $chr --keep-allele-order \
-#             --recode vcf --out ${out_dir}/tmp_chr${chr}
-#       if [ "$to_build_num" == "38" ]; then
-#          vcf-sort ${out_dir}/tmp_chr${chr}.vcf | \
-#             sed -E 's/^([0-9XYM]+)/chr\1/' | \
-#             bgzip -c > ${out_dir}/chr${chr}_pre_qc.vcf.gz
-#       else
-#          vcf-sort ${out_dir}/tmp_chr${chr}.vcf | \
-#             sed -E 's/^chr([0-9XYM]+)/\1/' | \
-#             bgzip -c > ${out_dir}/chr${chr}_pre_qc.vcf.gz
-#       fi
-#    fi
-# # If chromosome 6 MHC region should have different HWE
-# elif [ "$chr6_hwe" == "yes" ]; then
-for c in $chr; do
-
+# to imputation server for QC.
+for c in "${chr[@]}"; do
    if [ "$c" == "6" ]; then
       echo "Processing chr6 with HWE 1e-20."
       # Get chr6 MHC region from Paul Norman's coordinates
-      start=$(head -n 1 mhc_extended_${build}.bed | awk -F':' '{gsub(/-.*/, "", $2); print $2}')
-      stop=$(tail -n 1 mhc_extended_${build}.bed | awk -F':' '{gsub(/-.*/, "", $2); print $2}')
+      start=$(head -n 1 refs/mhc_extended_hg${to_build_num}.bed | awk -F':' '{gsub(/-.*/, "", $2); print $2}')
+      stop=$(tail -n 1 refs/mhc_extended_hg${to_build_num}.bed | awk -F':' '{gsub(/-.*/, "", $2); print $2}')
 
       plink2 --pfile ${out_dir}/tmp_gwas_no_AT_CG_chrpos_ids --chr 6 \
          --from-bp $start --to-bp $stop \
@@ -162,94 +124,80 @@ for c in $chr; do
       plink --bfile ${out_dir}/tmp_mhc_pre_qc \
          --bmerge ${out_dir}/tmp_non_mhc_pre_qc \
          --keep-allele-order \
-         --make-bed --out ${out_dir}/chr6_pre_qc
+         --make-bed --out ${out_dir}/tmp_chr6_pre_qc
    else
       echo "Processing chr$c with HWE 1e-6."
          plink2 --pfile ${out_dir}/tmp_gwas_no_AT_CG_chrpos_ids \
          --maf 0.000001 --geno 0.05 --hwe 0.000001 \
-         --not-chr 6 \
-         --make-bed --out ${out_dir}/chr${c}_pre_qc
-      
-      #TODO: finish here! NEed to add merge of all chr after this!
-
-      # Need to write out pre_qc with all chr for next pipeline step
-      plink --bfile ${out_dir}/non_chr6_pre_qc \
-         --bmerge ${out_dir}/chr6_pre_qc \
-         --keep-allele-order \
-         --make-bed --out ${out_dir}/pre_qc
-
-      for ((chr_num=1; chr_num<=22; chr_num++)); do
-         plink --bfile ${out_dir}/pre_qc \
-            --chr $chr_num --keep-allele-order \
-            --recode vcf --out ${out_dir}/tmp_chr${chr_num}
-         if [ "$to_build_num" == "38" ]; then
-            vcf-sort ${out_dir}/tmp_chr${chr_num}.vcf | \
-               sed -E 's/^([0-9XYM]+)/chr\1/' | \
-               bgzip -c > ${out_dir}/chr${chr_num}_pre_qc.vcf.gz
-         else
-            vcf-sort ${out_dir}/tmp_chr${chr_num}.vcf | \
-               sed -E 's/^chr([0-9XYM]+)/\1/' | \
-               bgzip -c > ${out_dir}/chr${chr_num}_pre_qc.vcf.gz
-         fi
-
-      done
-   # If preparing only chr6
-   else
-      # Need to write out pre_qc for next pipeline step
-      plink --bfile ${out_dir}/chr6_pre_qc \
-         --keep-allele-order \
-         --make-bed --out ${out_dir}/pre_qc
-
-      plink --bfile ${out_dir}/pre_qc \
-         --chr $chr --keep-allele-order \
-         --recode vcf --out ${out_dir}/tmp_chr${chr}
-
-      if [ "$to_build_num" == "38" ]; then
-         vcf-sort ${out_dir}/tmp_chr${chr}.vcf | \
-            sed -E 's/^([0-9XYM]+)/chr\1/' | \
-            bgzip -c > ${out_dir}/chr${chr}_pre_qc.vcf.gz
-      else
-         vcf-sort ${out_dir}/tmp_chr${chr}.vcf | \
-            sed -E 's/^chr([0-9XYM]+)/\1/' | \
-            bgzip -c > ${out_dir}/chr${chr}_pre_qc.vcf.gz
-      fi
+         --chr "$c" \
+         --make-bed --out ${out_dir}/tmp_chr${c}_pre_qc
    fi
+done
+
+# If multiple chrs being processed, prep for merge of all chr,
+# which is needed to next pipeline step
+if [ "${#chr[@]}" -gt 1 ]; then
+   echo "Processing more than one chr."
+   base_chr=${chr[0]}
+   merge_list="${out_dir}/tmp_merge_list.txt"
+
+   for c in "${chr[@]}"; do
+      if [ "$c" != "$base_chr" ]; then
+         echo "${out_dir}/tmp_chr${c}_pre_qc" >> "$merge_list"
+      fi
+   done
+
+   # Merge all chr currently preparing
+   plink --bfile ${out_dir}/tmp_chr${base_chr}_pre_qc \
+      --merge-list "$merge_list" \
+      --keep-allele-order \
+      --make-bed --out ${out_dir}/pre_qc
+else
+   echo "Processing only one chr."
+   plink --bfile ${out_dir}/tmp_chr${chr[0]}_pre_qc \
+      --keep-allele-order \
+      --make-bed --out ${out_dir}/pre_qc
 fi
+
+# Write out VCF files split by chr for imputation.
+for c in "${chr[@]}"; do
+   plink --bfile ${out_dir}/pre_qc \
+      --chr $c --keep-allele-order \
+      --recode vcf --out ${out_dir}/tmp_chr${c}
+   if [ "$to_build_num" == "38" ]; then
+      vcf-sort ${out_dir}/tmp_chr${c}.vcf | \
+         sed -E 's/^([0-9XYM]+)/chr\1/' | \
+         bgzip -c > ${out_dir}/chr${c}_pre_qc.vcf.gz
+   else
+      vcf-sort ${out_dir}/tmp_chr${c}.vcf | \
+         sed -E 's/^chr([0-9XYM]+)/\1/' | \
+         bgzip -c > ${out_dir}/chr${c}_pre_qc.vcf.gz
+   fi
+done
 
 # Report SNP counts
 orig_snp_nr=`wc -l ${plink_prefix}.bim`
-crossover_snp_nr=`wc -l ${out_dir}/tmp_gwas.bim`
-nonamb_snp_nr=`wc -l ${out_dir}/tmp_gwas_no_AT_CG.bim`
 echo "Original SNP nr: $orig_snp_nr"
-echo "Crossovered SNP nr: $crossover_snp_nr"
-echo "Non-ambiguous SNP nr: $nonamb_snp_nr"
-echo "Original SNP nr: $orig_snp_nr" > ${out_dir}/create_initial_input_log.txt
-echo "Crossovered SNP nr: $crossover_snp_nr" >> ${out_dir}/create_initial_input_log.txt
-echo "Non-ambiguous SNP nr: $nonamb_snp_nr" >> ${out_dir}/create_initial_input_log.txt
 
-if [ "$chr6_hwe" != "yes" ]
-then
-   qc_snp_nr=`wc -l ${out_dir}/pre_qc.bim`
-   echo "Final SNP nr after QC: $qc_snp_nr"
-   echo "Final SNP nr after QC: $qc_snp_nr" >> ${out_dir}/create_initial_input_log.txt
+if [ "$orig_build_num" != "$to_build_num" ]; then
+   crossover_snp_nr=`wc -l ${out_dir}/tmp_gwas.bim`
+   echo "Crossovered SNP nr: $crossover_snp_nr"
+fi
+
+nonamb_snp_nr=`wc -l ${out_dir}/tmp_gwas_no_AT_CG.bim`
+echo "Non-ambiguous SNP nr: $nonamb_snp_nr"
+
+# Report all chr prepared
+qc_snp_nr=`wc -l ${out_dir}/pre_qc.bim`
+echo "Final SNP nr after QC, subset to only processed chrs: $qc_snp_nr"
    
-else
+# Report details on just chr6, if prepared
+if [[ " ${chr[@]} " =~ " 6 " ]]; then
    qc_snp_nr_mhc=`wc -l ${out_dir}/tmp_mhc_pre_qc.bim`
    qc_snp_nr_non_mhc=`wc -l ${out_dir}/tmp_non_mhc_pre_qc.bim` 
    echo "Final chr6 MHC SNP nr after QC: $qc_snp_nr_mhc"
    echo "Final chr6 non-MHC SNP nr after QC: $qc_snp_nr_non_mhc"
-   echo "Final chr6 MHC SNP nr after QC: $qc_snp_nr_mhc" >> \
-      ${out_dir}/create_initial_input_log.txt
-   echo "Final chr6 non-MHC SNP nr after QC: $qc_snp_nr_non_mhc" >> \
-      ${out_dir}/create_initial_input_log.txt
-   
-   if [ "$chr" == "all" ]
-   then
-      qc_snp_nr_non_chr6=`wc -l ${out_dir}/non_chr6_pre_qc.bim`
-      echo "Final all other chr (non-chr6) SNP nr after QC: $qc_snp_nr_non_chr6"
-      echo "Final all other chr (non-chr6) SNP nr after QC: $qc_snp_nr_non_chr6" >> \
-         ${out_dir}/create_initial_input_log.txt
-   fi
+
 fi
 
 # Cleanup

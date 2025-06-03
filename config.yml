@@ -3,11 +3,9 @@
 # PLINK1.9 file prefix with path
   # must be a single file, but file can contain one or multiple chromosomes
 plink_prefix: "/data/input/daisyexome"
-out_dir: "/data"  # top-level directory for all output
-code_dir: "/repo"  # top-level of topmed_imputation repo in
-chr: "21"  # either one chr number or "all"
-orig_build: "hg38"  #  either hg19 or hg 38
-to_build: ""  # either hg19 or hg38
-chr6_hwe: = "no"  # either "yes" for chr6 different HWE filter or "no" for same
-
-#TODO: do I need an MIS or TM indicator?
+out_dir: "/data"  # top-level directory for all output in container
+code_dir: "/repo"  # top-level of topmed_imputation repo in container
+chr: [21, 22]  # list of chromosome numbers with format [1,10,22]
+orig_build: "hg38"  #  either "hg19" or "hg38"
+to_build: "hg38"  # either "hg19" or "hg38"
+imp:  "tm"  # should be "mich" or "tm"

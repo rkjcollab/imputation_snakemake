@@ -65,3 +65,6 @@ rsconnect/
 
 # Env files
 *.sif
+
+# Snakemake files
+*.snakemake/

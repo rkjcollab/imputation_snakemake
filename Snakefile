@@ -1,57 +1,61 @@
 # Setup -----------------------------------------------------------------------------------------
 
-
 # Grab paths and variables from the config file
 plink_prefix: str = config["plink_prefix"]
 out_dir: str = config["out_dir"]
-code_dir: str = config["code_dir"]
-chr: str = config["chr_dir"]
-
-chr_list: ["21"]
-build: "hg38"
-chr6_hwe: = "no"
+chr: List[str] = config["chr"]
+orig_build: str = config["orig_build"]
+to_build: str = config["to_build"]
+imp: str = config["imp"]
 
 # Make output dirs
-#TODO: is this the correct way to do it?
 Path(out_dir, "pre_qc").mkdir(parents=True, exist_ok=True)
 Path(out_dir, "post_qc").mkdir(parents=True, exist_ok=True)
 Path(out_dir, "imputed").mkdir(parents=True, exist_ok=True)
+
+# Modify chr array for bash script
+chr_str = " ".join(map(str, chr))
 
 # Rules -----------------------------------------------------------------------------------------
 
 rule all:
     input:
-        # expand("imputed/chr{chr}.dose.vcf.gz", chr=chr)  # final imputed filesxs
-        [f"{out_dir}/pre_qc/chr{chr}_pre_qc.vcf.gz" for chr in chr]  # temp after first step
+        # expand("imputed/chr{chr}.dose.vcf.gz", chr=chr)  # final imputed files
+        [f"{out_dir}/pre_qc/chr{c}_pre_qc.vcf.gz" for c in chr]  # temp after first step
 
-#TODO: need to update bash script to not check if PLINK2 given!
 rule create_initial_input:
     input:
         f"{plink_prefix}.bed",
         f"{plink_prefix}.bim",
         f"{plink_prefix}.fam"
     output:
-        [f"{out_dir}/pre_qc/chr{chr}_pre_qc.vcf.gz" for chr in chr_list]
-    params:
-        orig_build="hg38",
-        to_build="hg19",
-        chr6_hwe="no"
+        [f"{out_dir}/pre_qc/chr{c}_pre_qc.vcf.gz" for c in chr]
+    log:
+        f"{out_dir}/pre_qc/create_initial_input.log"
     shell:
         """
-        bash {code_dir}/create_initial_input.sh \
+        bash scripts/create_initial_input.sh \
             -p {plink_prefix} \
             -o {out_dir}/pre_qc \
-            -c {code_dir} \
-            -n {chr_list} \
-            -b {params.orig_build} \
-            -b {params.to_build} \
-            -h {params.chr6_hwe}
+            -c "{chr_str}" \
+            -b {orig_build} \
+            -t {to_build} \
+            > {log} 2>&1
         """
 
-#TODO: think chr_list here is wrong! 
-
-rule debug_check:
+rule fix_strands:
     input:
-        f"{plink_prefix}.bed"
+        [f"{out_dir}/pre_qc/chr{c}_pre_qc.vcf.gz" for c in chr]
+    output:
+        [f"{out_dir}/post_qc/chr{c}_post_qc.vcf.gz" for c in chr]
+    log:
+        f"{out_dir}/post_qc/fix_strands.log"
     shell:
-        "ls -l {input}"
+        """
+        bash scripts/fix_strands.sh \
+            -o {out_dir} \
+            -c "{chr_str}" \
+            -t {to_build} \
+            -i {imp} \
+            > {log} 2>&1
+        """
