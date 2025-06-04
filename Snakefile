@@ -43,9 +43,28 @@ rule create_initial_input:
             > {log} 2>&1
         """
 
-rule fix_strands:
+rule submit_initial_input:
     input:
         [f"{out_dir}/pre_qc/chr{c}_pre_qc.vcf.gz" for c in chr]
+    output:
+        f"{out_dir}/pre_qc/submit_initial_input.log"
+    log:
+        f"{out_dir}/pre_qc/submit_initial_input.log"
+    shell:
+        """
+        python scripts/submit.py \
+            --dir {out_dir}/pre_qc \
+            --chr "{chr_str}" \
+            --imp {imp} \
+            --build {to_build} \
+            --mode "qconly" \
+            > {log} 2>&1
+        """
+
+rule fix_strands:
+    input:
+        f"{out_dir}/pre_qc/snps-excluded.txt",
+        f"{out_dir}/pre_qc/submit_initial_input.log"
     output:
         [f"{out_dir}/post_qc/chr{c}_post_qc.vcf.gz" for c in chr]
     log:
@@ -57,5 +76,23 @@ rule fix_strands:
             -c "{chr_str}" \
             -t {to_build} \
             -i {imp} \
+            > {log} 2>&1
+        """
+
+rule submit_fix_strands:
+    input:
+        [f"{out_dir}/post_qc/chr{c}_post_qc.vcf.gz" for c in chr]
+    output:
+        f"{out_dir}/post_qc/submit_fix_strands.log"
+    log:
+        f"{out_dir}/post_qc/submit_fix_strands.log"
+    shell:
+        """
+        python scripts/submit.py \
+            --dir {out_dir}/post_qc \
+            --chr "{chr_str}" \
+            --imp {imp} \
+            --build {to_build} \
+            --mode "imputation" \
             > {log} 2>&1
         """

@@ -11,7 +11,7 @@ apptainer exec \
     --bind /Users/slacksa/tm_test_data:/data \
     envs/topmed_imputation.sif \
     snakemake --snakefile /repo/Snakefile --configfile /repo/config.yml \
-        --cores 8 --until fix_strands
+        --cores 8 --until submit_fix_strands
 
 
 # Current process
