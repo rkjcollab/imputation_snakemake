@@ -1,0 +1,16 @@
+# Paths here are relative to container binding
+
+# PLINK1.9 file prefix with path
+  # must be a single file, but file can contain one or multiple chromosomes
+plink_prefix: "/data/input/daisyexome"
+out_dir: "/data"  # top-level directory for all output in container
+code_dir: "/repo"  # top-level of topmed_imputation repo in container
+chr: [6]  # list of chromosome numbers with format [1,10,22]
+orig_build: "hg19"  #  either "hg19" or "hg38"
+to_build: "hg19"  # either "hg19" or "hg38"
+imp:  "mich_hla_v2"  # should be 'topmed', 'mich_hla_v1', 'mich_hla_v2', 'mich_1kg_p3_v5'
+
+#TODO: can remove an argument so that to_build auto set by which imputation being run?
+  # for now, until do this, using to_build as the imputation build arg
+
+# note that for all population is automatically set to all

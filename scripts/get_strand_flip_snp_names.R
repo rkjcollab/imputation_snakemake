@@ -17,13 +17,13 @@ get_strand_flip_snp_names <- function(pre_qc_dir, post_qc_dir, imp_server) {
                          stringsAsFactors = F)
   
   # Add column with chr:pos for all variants
-  if (imp_server == "tm") {
+  if (imp_server == "topmed") {
     snp.excl$chr <- as.numeric(
       gsub("chr", "", unlist(strsplit(snp.excl$X.Position, split=":"))[seq(1,dim(snp.excl)[1]*4,4)]))
     snp.excl$pos <- as.numeric(
       unlist(strsplit(snp.excl$X.Position, split=":"))[seq(2,dim(snp.excl)[1]*4,4)])
     snp.excl$chr.pos <- paste0(snp.excl$chr, ":", snp.excl$pos)
-  } else if (imp_server == "mich") {
+  } else if (grepl("mich", imp_server)) {
     snp.excl$chr.pos <- paste0(snp.excl$CHROM, ":", snp.excl$POS)
     snp.excl$FilterType <- snp.excl$INFO  # copy to same col name as tm
     snp.excl$Info <- snp.excl$INFO  # copy to same col name as tm

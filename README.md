@@ -1,55 +1,111 @@
-Pipeline for imputing autosomal GWAS array data with hg19 coordinates to the
-TOPMed reference panel (which requires liftover to hg38 coordinates) on the
-Michigan Imputation server. 
 
-## Software requirements
+## TODOs
 
-The following command line tools are assumed to be installed and in the system
-path:
+* update below!
+* add instructions for making apptainer
+* add instructions for getting TOPMed API key and/or manual submit?
+* add note that need to lift input data over to match reference panel
+    build otherwise won't be able to use fix strands code.
+* currently only implemented topmed r3, michigan 1000g phase 3 v5, michigian hla
+    four-digit multi-ethnic v1 and v2.
+* instead of step 2, could I make a script where user gives download link and 
+    then auto-downloads to right spot in files?
+* update container to include software needed to view DAG
+* add checks that config values are only the allowable ones?
+* add QA/tests from CSCI6118?
+* revisit auto download before fix strands step
+* add more documentation to python functions
 
-* plink (v1.9 and later)
-* VCFtools
-* bgzip
-* CrossMap (http://crossmap.sourceforge.net)
-* 7zip (if downloading files to a local machine)
+## **imputation_snakemake**
 
-## Input files
+Pipeline for imputing autosomal genetic array data with hg19 or hg38 coordinates
+to the TOPMed r3 reference panel, the Michigian 1000 genomes phase 3 version 5
+reference panel, or the Michigan HLA four-digit multi-ethnic v1 or v2 panels.
 
-* GWAS array data in the binary plink file format
+Adapted from Michelle Daya's topmed_imputation pipeline.
 
-## Step 1
+## Setup
 
-Run the create\_initial\_files.sh script to create the initial input files to
-upload to the Michigian Imputation server for pre-imputaiton QC
+### Apptainer
 
-<code>bash create\_initial\_files.sh \<plink\_file\_prefix\> \<out\_dir\></code>
+TODO: add directions to build from .def
 
-Notes: 
+### Conda Environment
 
-* If QC was already run on the PLINK input files, you may want to comment out the "pre-imputation QC" step in the script
-* Check (and record for future reference e.g. paper write-up) the output printed at the end of the script - excess number of SNPs removed may point to an unexpected problem in the workflow
+TODO: make recipe file!
+
+## Input Files
+
+* Genetic array data in PLINK1.9 file format.
+
+## How to Run
+
+The bash script "run_pipeline.sh" includes an example of running all steps of the
+pipeline. Each step is also described below. The only files that need to be edited
+before running is "config.yml" and "run_pipeline.sh", if using.
+
+### Step 0
+
+Update "config.yml" with paths and settings specific to the data:
+
+```
+plink_prefix: "path/to/plink_prefix"
+out_dir: "path/to/data"  # top-level directory for all output in container
+code_dir: "path/to/imputation_snakemake"  # top-level of topmed_imputation repo in container
+chr: [6,10,22]  # list of chromosome numbers with format [6,10,22]
+orig_build: "hg19"  #  either "hg19" or "hg38"
+to_build: "hg38"  # either "hg19" or "hg38"
+imp:  "mich_hla_v2"  # should be 'topmed', 'mich_hla_v1', 'mich_hla_v2', 'mich_1kg_p3_v5'
+```
+
+### Step 1
+
+Use the snakefile to run the pipeline through the "submit_initial_input" step:
+
+```
+apptainer exec \
+    --writable-tmpfs \
+    --bind /Users/slacksa/repos/imputation_snakemake:/repo \
+    --bind /Users/slacksa/tm_test_data:/data \
+    envs/topmed_imputation.sif \
+    snakemake --snakefile /repo/Snakefile --configfile /repo/config.yml \
+        --cores 8 --until submit_initial_input
+
+```
+
+This will create and upload the initial input files to the imputation server and panel
+selected in the config file.
+
+The pre-imputation QC includes liftover (if necessary), removal of strand ambiguous SNPs,
+updating all variant IDs to chr:pos:ref:alt, filtering by PLINK2 --maf (1e-6), --geno (0.05),
+and --hwe (1e-20 for chr6 MHC region, 1e-6 for all other regions/chromosomes). A summary of
+each step is included in the log file.
 
 ## Step 2
 
-Upload the output pre-QC files from Step 1 to the Michigan imputation server for
-imputation QC against the TOPMed reference panel
-
-* Select Array Build GRCh38/hg38 (this was taken care off by the previous steps and makes it easier to do strand flips in the next step)
-* Skip the QC frequency check - TOPMed is a mixed ancestry reference panel so this step may flag allele frequency differences that are actually OK
-* Select Quality Control only
-
-Once the QC has run, check the output on the imputation server, and download the
-snps-excluded.txt file to the same directory as the pre-QC input files.
-It is a good idea to also download the typed-only.txt files and
+Once the QC automatically submitted has run, you will receive an email. Log into the
+imputation server, and download the snps-excluded.txt file to the same directory as the
+pre-QC input files (this will be in directory called "pre_qc" in the "out_dir" provided in
+the config file). It is a good idea to also download the typed-only.txt files and
 chunks-excluded.txt files as well, in case you ever need to refer back to this.
 
 ## Step 3
 
-Run the fix\_strands.sh script to flip strands of variants identified as such in
-the snps-exlcuded.txt file - this will produce the final post QC VCF files for
-imputation
+Use the snakefile to run the pipeline through the "submit_fixed_strands" step:
 
-<code>fix\_strands.sh \<pre\_qc\_dir\> \<post\_qc\_dir\></code>
+```
+apptainer exec \
+    --writable-tmpfs \
+    --bind /Users/slacksa/repos/imputation_snakemake:/repo \
+    --bind /Users/slacksa/tm_test_data:/data \
+    envs/topmed_imputation.sif \
+    snakemake --snakefile /repo/Snakefile --configfile /repo/config.yml \
+        --cores 8 --until submit_fixed_strands
+
+```
+
+This step flips strands of variants identified as such in the snps-exlcuded.txt file - this
+will produce the final post QC VCF files for imputation.
 
 ## Step 4
 
@@ -62,24 +118,7 @@ imputation against the TOPMed reference panel
 
 ## Step 5
 
-### To download and unzip files to a local machine
-
 The imputation server will send an email with a download link once the
 imputations are done. Use the wget commands to download the imputed files to the
 desired folder. After the download completed, use the unzip\_results.sh script to unzip the files with the
 provided password.
-
-<code>unzip\_results.sh \<impute\_\dir> \<zip\_password\></code>
-
-### To download and unzip files directly to a Seven Bridges Biodata Catalyst project
-
-Use get\_imp\_server\_results.cwl to create a Seven Bridges tool. The docker
-image in the Dockerfile describes the compute environment required for running
-the tool. 
-
-The imputation server will send an email with a download link once the
-imputations are done. Use the get\_imp\_server\_results.cwl tool to download and unzip files. 
-The URL from the example curl command should be used to set the curl\_url parameter, 
-and the provided password from the email shoud be used for the zip\_pwd parameter. 
-
-
