@@ -5,11 +5,12 @@ set -u
 
 # Added getopts based on Sam's example:
 # https://github.com/pozdeyevlab/gnomad-query/blob/main/bcftools_query.sh
-while getopts p:o:c:b:t: opt; do
+while getopts p:o:c:n:b:t: opt; do
    case "${opt}" in
       p) plink_prefix=${OPTARG};;
       o) out_dir=${OPTARG};;
-      c) chr=${OPTARG};;
+      c) code_dir=${OPTARG};;
+      n) chr=${OPTARG};;
       b) orig_build=${OPTARG};;
       t) to_build=${OPTARG};;
       \?) echo "Invalid option -$OPTARG" >&2
@@ -55,7 +56,7 @@ if [ "$orig_build_num" != "$to_build_num" ]; then
          ${out_dir}/tmp_c4.txt \
          >  ${out_dir}/tmp_in.bed
 
-   CrossMap bed refs/hg${orig_build_num}ToHg${to_build_num}.over.chain \
+   CrossMap bed ${code_dir}/refs/hg${orig_build_num}ToHg${to_build_num}.over.chain \
       ${out_dir}/tmp_in.bed  \
       ${out_dir}/tmp_out.bed
 
@@ -67,8 +68,8 @@ if [ "$orig_build_num" != "$to_build_num" ]; then
       --make-bed --out ${out_dir}/tmp_gwas
 
    # Update bim file positions
-   Rscript --vanilla scripts/update_pos.R \
-   ${out_dir}/tmp_out.bed ${out_dir}/tmp_gwas.bim
+   Rscript --vanilla ${code_dir}/scripts/update_pos.R \
+      ${out_dir}/tmp_out.bed ${out_dir}/tmp_gwas.bim
 
 else 
    echo "Not lifting over"
@@ -78,7 +79,7 @@ else
 fi
 
 # Remove strand ambiguous SNPs
-Rscript --vanilla scripts/get_strand_amb_SNPs.R ${out_dir}/tmp_no_dupl.bim
+Rscript --vanilla ${code_dir}/scripts/get_strand_amb_SNPs.R ${out_dir}/tmp_no_dupl.bim
 plink --bfile ${out_dir}/tmp_gwas \
    --exclude ${out_dir}/tmp_strand_remove_snps.txt \
    --keep-allele-order \
@@ -96,8 +97,10 @@ for c in "${chr[@]}"; do
    if [ "$c" == "6" ]; then
       echo "Processing chr6 with HWE 1e-20."
       # Get chr6 MHC region from Paul Norman's coordinates
-      start=$(head -n 1 refs/mhc_extended_hg${to_build_num}.bed | awk -F':' '{gsub(/-.*/, "", $2); print $2}')
-      stop=$(tail -n 1 refs/mhc_extended_hg${to_build_num}.bed | awk -F':' '{gsub(/-.*/, "", $2); print $2}')
+      start=$(head -n 1 ${code_dir}/refs/mhc_extended_hg${to_build_num}.bed |
+         awk -F':' '{gsub(/-.*/, "", $2); print $2}')
+      stop=$(tail -n 1 ${code_dir}/refs/mhc_extended_hg${to_build_num}.bed |
+         awk -F':' '{gsub(/-.*/, "", $2); print $2}')
 
       plink2 --pfile ${out_dir}/tmp_gwas_no_AT_CG_chrpos_ids --chr 6 \
          --from-bp $start --to-bp $stop \
@@ -123,7 +126,7 @@ for c in "${chr[@]}"; do
       # Merge chr6 back together
       plink --bfile ${out_dir}/tmp_mhc_pre_qc \
          --bmerge ${out_dir}/tmp_non_mhc_pre_qc \
-         --keep-allele-order \
+         --keep-allele-order --allow-no-sex \
          --make-bed --out ${out_dir}/tmp_chr6_pre_qc
    else
       echo "Processing chr$c with HWE 1e-6."
@@ -150,7 +153,7 @@ if [ "${#chr[@]}" -gt 1 ]; then
    # Merge all chr currently preparing
    plink --bfile ${out_dir}/tmp_chr${base_chr}_pre_qc \
       --merge-list "$merge_list" \
-      --keep-allele-order \
+      --keep-allele-order --allow-no-sex \
       --make-bed --out ${out_dir}/pre_qc
 else
    echo "Processing only one chr."

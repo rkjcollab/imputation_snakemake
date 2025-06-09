@@ -47,7 +47,7 @@ def get_args():
                         required=True,
                         help='Space-separated list of chromosomes "21 22".')
     parser.add_argument('--imp',
-                        choices = ['topmed', 'mich_hla_v1', 'mich_hla_v2', 'mich_1kg_p3_v5'],
+                        choices = ['topmed', 'mich_hla_v1', 'mich_hla_v2', 'mich_1kg_p3_v5', 'mich_hrc'],
                         required=True,
                         help='Imputation server to be used.')
     parser.add_argument('--build',
@@ -58,6 +58,10 @@ def get_args():
                         choices = ['qconly', 'imputation'],
                         required=True,
                         help="Choose between running QC only or full imputation.")
+    parser.add_argument('--imp-name',
+                        type=str,
+                        required=True,
+                        help="Job name for imputation server.")
 
     args = parser.parse_args()
     return args
@@ -70,10 +74,10 @@ def submit_topmed(args):
     # add token to header (see documentation for Authentication)
     headers = {'X-Auth-Token' : token }
     data = {
-    'job-name': 'snakemake_test',
+    'job-name': args.imp_name,
     'refpanel': 'apps@topmed-r3',
     'mode': args.mode,
-    'population': 'all',
+    'population': 'all',  # compares to TOPMed reference panel
     'build': args.build,
     'phasing': 'eagle',
     'r2Filter': 0
@@ -119,14 +123,16 @@ def submit_mich(args):
         refpanel = 'multiethnic-hla-panel-4digit'
     elif args.imp == 'mich_hla_v2':
         refpanel = 'multiethnic-hla-panel-4digit-v2'
+    elif args.imp == "mich_hrc":
+        refpanel = 'hrc-r1.1'
 
     # add token to header (see Authentication)
     headers = {'X-Auth-Token' : token }
     data = {
-    'job-name': 'snakemake_test',
+    'job-name': args.imp_name,
     'refpanel': refpanel,
     'mode': args.mode,
-    'population': 'all',
+    'population': 'off',  # no AF QC check done
     'build': args.build,
     'phasing': 'eagle',
     'r2Filter': 0

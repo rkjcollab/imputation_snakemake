@@ -15,6 +15,12 @@
 * add QA/tests from CSCI6118?
 * revisit auto download before fix strands step
 * add more documentation to python functions
+* think could remove a config arg so that to_build is auto set based on chosen
+    imputation
+* not sure how to better handle relative paths within the pipeline directory?
+* need a better solution for running first vs. second vs. third phase than
+    switching the until portion of the snakemake command
+
 
 ## **imputation_snakemake**
 
@@ -57,6 +63,12 @@ orig_build: "hg19"  #  either "hg19" or "hg38"
 to_build: "hg38"  # either "hg19" or "hg38"
 imp:  "mich_hla_v2"  # should be 'topmed', 'mich_hla_v1', 'mich_hla_v2', 'mich_1kg_p3_v5'
 ```
+
+Note that for TOPMed imputation, the 'population' option is set to 'all', which means allele
+frequencies will be compared between the input data and the TOPMed panel to generate a QC
+report. For Michigan imputation, the 'population' option is set to 'off', since (at least
+for 1000G whole genome imputation) there is no good option for allele frequency comparison
+for mixed populations. Either way, imputation results should not be affected.
 
 ### Step 1
 

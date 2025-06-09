@@ -3,10 +3,11 @@
 set -e
 set -u
 
-while getopts o:c:t:i: opt; do
+while getopts o:c:n:t:i: opt; do
    case "${opt}" in
       o) out_dir=${OPTARG};;
-      c) chr=${OPTARG};;
+      c) code_dir=${OPTARG};;
+      n) chr=${OPTARG};;
       t) to_build=${OPTARG};;
       i) imp=${OPTARG};;
       \?) echo "Invalid option -$OPTARG" >&2
@@ -18,7 +19,7 @@ done
 chr=($chr)
 
 #Get list of SNPs to flip
-Rscript --vanilla scripts/get_strand_flip_snp_names.R \
+Rscript --vanilla ${code_dir}/scripts/get_strand_flip_snp_names.R \
     ${out_dir}/pre_qc ${out_dir}/post_qc $imp
 
 #Create vcf files for uploading to imputation server for QC

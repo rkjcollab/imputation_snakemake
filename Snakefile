@@ -7,6 +7,7 @@ chr: List[str] = config["chr"]
 orig_build: str = config["orig_build"]
 to_build: str = config["to_build"]
 imp: str = config["imp"]
+imp_name: str = config["imp_name"]
 
 # Make output dirs
 Path(out_dir, "pre_qc").mkdir(parents=True, exist_ok=True)
@@ -15,6 +16,9 @@ Path(out_dir, "imputed").mkdir(parents=True, exist_ok=True)
 
 # Modify chr array for bash script
 chr_str = " ".join(map(str, chr))
+
+# Get dir of pipeline
+code_dir = Path(workflow.snakefile).resolve().parent
 
 # Rules -----------------------------------------------------------------------------------------
 
@@ -32,12 +36,15 @@ rule create_initial_input:
         [f"{out_dir}/pre_qc/chr{c}_pre_qc.vcf.gz" for c in chr]
     log:
         f"{out_dir}/pre_qc/create_initial_input.log"
+    params:
+        script=Path(code_dir, "scripts/create_initial_input.sh")
     shell:
         """
-        bash scripts/create_initial_input.sh \
+        bash {params.script} \
             -p {plink_prefix} \
             -o {out_dir}/pre_qc \
-            -c "{chr_str}" \
+            -c {code_dir} \
+            -n "{chr_str}" \
             -b {orig_build} \
             -t {to_build} \
             > {log} 2>&1
@@ -50,14 +57,17 @@ rule submit_initial_input:
         f"{out_dir}/pre_qc/submit_initial_input.log"
     log:
         f"{out_dir}/pre_qc/submit_initial_input.log"
+    params:
+        script=Path(code_dir, "scripts/submit.py")
     shell:
         """
-        python scripts/submit.py \
+        python {params.script} \
             --dir {out_dir}/pre_qc \
             --chr "{chr_str}" \
             --imp {imp} \
             --build {to_build} \
             --mode "qconly" \
+            --imp-name {imp_name} \
             > {log} 2>&1
         """
 
@@ -69,11 +79,14 @@ rule fix_strands:
         [f"{out_dir}/post_qc/chr{c}_post_qc.vcf.gz" for c in chr]
     log:
         f"{out_dir}/post_qc/fix_strands.log"
+    params:
+        script=Path(code_dir, "scripts/fix_strands.sh")
     shell:
         """
-        bash scripts/fix_strands.sh \
+        bash {params.script} \
             -o {out_dir} \
-            -c "{chr_str}" \
+            -c {code_dir} \
+            -n "{chr_str}" \
             -t {to_build} \
             -i {imp} \
             > {log} 2>&1
@@ -86,13 +99,16 @@ rule submit_fix_strands:
         f"{out_dir}/post_qc/submit_fix_strands.log"
     log:
         f"{out_dir}/post_qc/submit_fix_strands.log"
+    params:
+        script=Path(code_dir, "scripts/submit.py")
     shell:
         """
-        python scripts/submit.py \
+        python {params.script} \
             --dir {out_dir}/post_qc \
             --chr "{chr_str}" \
             --imp {imp} \
             --build {to_build} \
             --mode "imputation" \
+            --imp-name {imp_name} \
             > {log} 2>&1
         """
