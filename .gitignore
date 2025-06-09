@@ -68,6 +68,13 @@ rsconnect/
 
 # Snakemake files
 *.snakemake/
+**/.snakemake/
 
 # File to store API keys
 key.py
+
+# Python files
+__pycache__/
+*.py[cod]
+*$py.class
+
