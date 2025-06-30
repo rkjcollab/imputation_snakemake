@@ -27,7 +27,9 @@ From: python:3.11-slim-bookworm
         r-base \
         tabix \
         bcftools \
-        vcftools
+        vcftools \
+        p7zip-full
+
     # CrossMap
     pip3 install --upgrade pip
     pip3 install CrossMap requests

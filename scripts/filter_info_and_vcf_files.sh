@@ -1,28 +1,35 @@
 #!/bin/bash
 
-#Set arguments
-if [ "$#" -eq  "0" ]
-then
-   echo "Usage: ${0##*/} <chr> <rsq> <maf> <in_dir> <out_dir>"
-   echo "Script filters new TOPMed INFO files formatted as VCFs."
-   echo "Keeps TYPED or IMPUTED with Rsq less than given threshold,"
-   echo "and filters MAF to given threshold."
-   echo "Script expects file formats: chr#.dose.vcf.gz & chr#.info.gz"
-   exit
-fi
-
 # TO NOTE: had initially written this to make two filesets - one with
 # genotypes and one that saved dosages. Dosages version was too large
 # to be feasible. If return with time to troubelshoot, should revisit.
 
-chr=$1
-rsq=$2
-maf=$3
-in_dir=$4
-out_dir=$5
+# TO NOTE: this script has one option that uses PLINK and another that
+# does  not, so preserves all dosage information in imputed VCF (helpful
+# for keeping HDS after Michigan HLA imputation). This also means that
+# the non-PLINK option is much slower and should only be run if more
+# than GT is needed.
 
-# Make all out dirs
-mkdir "${out_dir}"
+set -e
+set -u
+
+while getopts n:r:m:d:o: opt; do
+   case "${opt}" in
+      n) chr=${OPTARG};;
+      r) rsq=${OPTARG};;
+      m) maf=${OPTARG};;
+      d) dir=${OPTARG};;
+      o) option=${OPTARG};;
+      \?) echo "Invalid option -$OPTARG" >&2
+      exit 1;;
+   esac
+done
+
+
+# Make out dir
+in_dir="${dir}/imputed"
+out_dir="${dir}/imputed_clean_maf${maf}_rsq${rsq}"
+mkdir -p "${dir}/imputed_clean_maf${maf}_rsq${rsq}"
 
 # Set filter
 to_filt="((INFO/TYPED = 1 | (INFO/IMPUTED = 1 & INFO/R2 > ${rsq})) & INFO/MAF > ${maf})"
@@ -37,11 +44,20 @@ bcftools filter -i \
 bcftools query -f '%ID\n' \
     "${out_dir}/chr${chr}_clean.info" > "${out_dir}/chr${chr}_maf${maf}_rsq${rsq}_snps.txt"
 
-# Filter VCF to these IDs using PLINK, keeping GT
-plink2 --vcf "${in_dir}/chr${chr}.dose.vcf.gz" \
-  --export vcf 'bgz' \
-  --extract "${out_dir}/chr${chr}_maf${maf}_rsq${rsq}_snps.txt" \
-  --out "${out_dir}/tmp_chr${chr}_clean"
+# if option set to use PLINK for only GT
+if [ "$option" = "gt" ]; then
+    # Filter VCF to these IDs using PLINK, keeping GT
+    plink2 --vcf "${in_dir}/chr${chr}.dose.vcf.gz" \
+    --export vcf 'bgz' \
+    --extract "${out_dir}/chr${chr}_maf${maf}_rsq${rsq}_snps.txt" \
+    --out "${out_dir}/tmp_chr${chr}_clean"
+
+# if want to keep all dosage information, use bcftools (much slower)
+elif [ "$option" = "all" ]; then
+    # Filter VCF to these IDs using bcftools
+    bcftools view --include ID==@"$snp_list" "${in_dir}/chr${chr}.dose.vcf.gz" \
+        -Oz -o "${out_dir}/tmp_chr${chr}_clean.vcf.gz"
+fi
 
 # Finally, clean up RSIDs that may have appeared more than once, mainly '.' IDs.
 bcftools filter -i \
