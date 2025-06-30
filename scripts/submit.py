@@ -58,6 +58,10 @@ def get_args():
                         choices = ['qconly', 'imputation'],
                         required=True,
                         help="Choose between running QC only or full imputation.")
+    parser.add_argument('--rsq-filt',
+                        choices = ['0', '0.001', '0.1', '0.2', '0.3'],
+                        default = '0',
+                        help="Set Rsq imputation quality, default is 0.")
     parser.add_argument('--imp-name',
                         type=str,
                         required=True,
@@ -80,7 +84,7 @@ def submit_topmed(args):
     'population': 'all',  # compares to TOPMed reference panel
     'build': args.build,
     'phasing': 'eagle',
-    'r2Filter': 0
+    'r2Filter': args.rsq_filt
     }
 
     # select pre or post qc files
@@ -135,7 +139,7 @@ def submit_mich(args):
     'population': 'off',  # no AF QC check done
     'build': args.build,
     'phasing': 'eagle',
-    'r2Filter': 0
+    'r2Filter': args.rsq_filt
     }
 
     # select pre or post qc files

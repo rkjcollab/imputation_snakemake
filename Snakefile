@@ -7,12 +7,20 @@ chr: List[str] = config["chr"]
 orig_build: str = config["orig_build"]
 to_build: str = config["to_build"]
 imp: str = config["imp"]
+imp_rsq_filt: str = config["imp_rsq_filt"]
 imp_name: str = config["imp_name"]
+zip_pw: str = config["zip_pw"]
+opt: str = config["opt"]
+
+# Set default values currently not controlled by arguments
+maf = "0"
+rsq = "0.3"
 
 # Make output dirs
 Path(out_dir, "pre_qc").mkdir(parents=True, exist_ok=True)
 Path(out_dir, "post_qc").mkdir(parents=True, exist_ok=True)
 Path(out_dir, "imputed").mkdir(parents=True, exist_ok=True)
+Path(out_dir, "imputed_clean").mkdir(parents=True, exist_ok=True)
 
 # Modify chr array for bash script
 chr_str = " ".join(map(str, chr))
@@ -24,8 +32,7 @@ code_dir = Path(workflow.snakefile).resolve().parent
 
 rule all:
     input:
-        # expand("imputed/chr{chr}.dose.vcf.gz", chr=chr)  # final imputed files
-        [f"{out_dir}/pre_qc/chr{c}_pre_qc.vcf.gz" for c in chr]  # temp after first step
+        [f"{out_dir}/imputed_clean_maf{maf}_rsq{rsq}/chr{c}_clean.vcf.gz" for c in chr]
 
 rule create_initial_input:
     input:
@@ -109,6 +116,51 @@ rule submit_fix_strands:
             --imp {imp} \
             --build {to_build} \
             --mode "imputation" \
+            --rsq-filt {imp_rsq_filt} \
             --imp-name {imp_name} \
             > {log} 2>&1
         """
+
+# TODO: should update shell arguments here to be flagged, not positional
+# TODO: current script runs all chr regardless of chr setting, need to fix!
+rule unzip_results:
+    input:
+        [f"{out_dir}/imputed/chr_{c}.zip" for c in chr]
+    output:
+        [f"{out_dir}/imputed/chr{c}.dose.vcf.gz" for c in chr]
+    log:
+        f"{out_dir}/imputed/unzip_results.log"
+    params:
+        script=Path(code_dir, "scripts/unzip_results.sh")
+    shell:
+        """
+        bash {params.script} \
+            {out_dir}/imputed \
+            "{zip_pw}" \
+            > {log} 2>&1
+        """
+
+# Different from the other rules, this script in this rule runs once for
+# each chr
+# TODO: make ifelse more robust?
+rule filter_info_and_vcf_files:
+    input:
+        f"{out_dir}/imputed/chr{{chr}}.dose.vcf.gz"
+    output:
+        f"{out_dir}/imputed_clean_maf{maf}_rsq{rsq}/chr{{chr}}_clean.vcf.gz"
+    log:
+        f"{out_dir}/imputed_clean_maf{maf}_rsq{rsq}/chr{{chr}}_filter_info_and_vcf_files.log"
+    params:
+        script=f'{code_dir}/scripts/filter_info_and_vcf_files{"_bcftools" if opt == "all" else ""}.sh'
+    shell:
+        """
+        bash {params.script} \
+            -n {wildcards.chr} \
+            -r {rsq} \
+            -m {maf} \
+            -d {out_dir} \
+            -o {opt} \
+           > {log} 2>&1
+        """
+
+#TODO: need to add step that merges all VCFs into single PLINK file
