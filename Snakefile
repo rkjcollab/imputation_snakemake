@@ -26,7 +26,10 @@ code_dir = Path(workflow.snakefile).resolve().parent
 
 rule all:
     input:
-        [f"{out_dir}/imputed_clean_maf{maf}_rsq{rsq}/chr{c}_clean.vcf.gz" for c in chr]
+        # [f"{out_dir}/imputed_clean_maf{maf}_rsq{rsq}/chr{c}_clean.vcf.gz" for c in chr]
+        f"{out_dir}/imputed_clean_maf{maf}_rsq{rsq}/chr_all_concat.pvar",
+        f"{out_dir}/imputed_clean_maf{maf}_rsq{rsq}/chr_all_concat.psam",
+        f"{out_dir}/imputed_clean_maf{maf}_rsq{rsq}/chr_all_concat.pgen"
 
 rule create_initial_input:
     input:
@@ -162,3 +165,21 @@ rule filter_info_and_vcf_files:
         """
 
 #TODO: need to add step that merges all VCFs into single PLINK file
+
+rule concat_convert_to_plink:
+    input:
+        [f"{out_dir}/imputed_clean_maf{maf}_rsq{rsq}/chr{c}_clean.vcf.gz" for c in chr]
+    output:
+        f"{out_dir}/imputed_clean_maf{maf}_rsq{rsq}/chr_all_concat.pvar",
+        f"{out_dir}/imputed_clean_maf{maf}_rsq{rsq}/chr_all_concat.psam",
+        f"{out_dir}/imputed_clean_maf{maf}_rsq{rsq}/chr_all_concat.pgen"
+    log:
+        f"{out_dir}/imputed_clean_maf{maf}_rsq{rsq}/concat_convert_to_plink.log"
+    params:
+        script=Path(code_dir, "scripts/concat_convert_to_plink.sh")
+    shell:
+        """
+        python {params.script} \
+            --dir {out_dir}/imputed_clean_maf{maf}_rsq{rsq} \
+            > {log} 2>&1
+        """
