@@ -16,12 +16,6 @@ opt: str = config["opt"]
 maf = "0"
 rsq = "0.3"
 
-# Make output dirs
-Path(out_dir, "pre_qc").mkdir(parents=True, exist_ok=True)
-Path(out_dir, "post_qc").mkdir(parents=True, exist_ok=True)
-Path(out_dir, "imputed").mkdir(parents=True, exist_ok=True)
-Path(out_dir, "imputed_clean").mkdir(parents=True, exist_ok=True)
-
 # Modify chr array for bash script
 chr_str = " ".join(map(str, chr))
 
