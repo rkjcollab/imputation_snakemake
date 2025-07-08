@@ -66,4 +66,4 @@ bcftools filter -i \
 tabix "${out_dir}/chr${chr}_clean.vcf.gz"
 
 # Clean up
-rm -f ${out_dir}/tmp_chr${chr}*
+rm -f ${out_dir}/tmp_chr${chr}_*
