@@ -121,22 +121,26 @@ rule submit_fix_strands:
             > {log} 2>&1
         """
 
-# TODO: should update shell arguments here to be flagged, not positional
-# TODO: current script runs all chr regardless of chr setting, need to fix!
+# Different from the other rules, this script in this rule runs once for
+# each chr
 rule unzip_results:
     input:
-        [f"{out_dir}/imputed/chr_{c}.zip" for c in chr]
+        f"{out_dir}/imputed/chr_{{chr}}.zip"
+        # [f"{out_dir}/imputed/chr_{c}.zip" for c in chr]
     output:
-        [f"{out_dir}/imputed/chr{c}.dose.vcf.gz" for c in chr]
+        f"{out_dir}/imputed/chr{{chr}}.dose.vcf.gz"
+        # [f"{out_dir}/imputed/chr{c}.dose.vcf.gz" for c in chr]
     log:
-        f"{out_dir}/imputed/unzip_results.log"
+        f"{out_dir}/imputed/chr{{chr}}_unzip_results.log"
+        # f"{out_dir}/imputed/unzip_results.log"
     params:
         script=Path(code_dir, "scripts/unzip_results.sh")
     shell:
         """
         bash {params.script} \
-            {out_dir}/imputed \
-            "{zip_pw}" \
+            -d {out_dir}/imputed \
+            -p "{zip_pw}" \
+            -c {wildcards.chr} \
             > {log} 2>&1
         """
 
