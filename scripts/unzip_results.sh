@@ -5,7 +5,7 @@ set -u
 
 while getopts d:p:c: opt; do
    case "${opt}" in
-      d) imput_dir=${OPTARG};;
+      d) impute_dir=${OPTARG};;
       p) zip_password=${OPTARG};;
       c) chr=${OPTARG};;
       \?) echo "Invalid option -$OPTARG" >&2
