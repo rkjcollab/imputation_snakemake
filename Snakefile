@@ -180,6 +180,6 @@ rule concat_convert_to_plink:
     shell:
         """
         bash {params.script} \
-            --dir {out_dir}/imputed_clean_maf{maf}_rsq{rsq} \
+            -d {out_dir}/imputed_clean_maf{maf}_rsq{rsq} \
             > {log} 2>&1
         """
