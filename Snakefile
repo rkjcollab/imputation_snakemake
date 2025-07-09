@@ -179,7 +179,7 @@ rule concat_convert_to_plink:
         script=Path(code_dir, "scripts/concat_convert_to_plink.sh")
     shell:
         """
-        python {params.script} \
+        bash {params.script} \
             --dir {out_dir}/imputed_clean_maf{maf}_rsq{rsq} \
             > {log} 2>&1
         """
