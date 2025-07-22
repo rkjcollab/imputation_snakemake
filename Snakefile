@@ -1,8 +1,7 @@
 # Setup -----------------------------------------------------------------------------------------
 
-# Grab paths and variables from the config file
-plink_prefix: str = config["plink_prefix"]
-out_dir: str = config["out_dir"]
+### Get variables from config file
+# Pipeline settings
 chr: List[str] = config["chr"]
 orig_build: str = config["orig_build"]
 to_build: str = config["to_build"]
@@ -12,6 +11,16 @@ imp_name: str = config["imp_name"]
 zip_pw: str = config["zip_pw"]
 opt: str = config["opt"]
 
+# Host paths outside container
+plink_prefix: str = config["plink_prefix"]
+plink_prefix_name = Path(plink_prefix).name
+id_list_hwe: str = config["id_list_hwe"]
+
+# Container paths
+plink_dir: str = config["plink_dir_cont"]
+out_dir: str = config["out_dir_cont"]
+
+### Other prep
 # Set default values currently not controlled by arguments
 maf = "0"
 rsq = "0.3"
@@ -33,9 +42,9 @@ rule all:
 
 rule create_initial_input:
     input:
-        f"{plink_prefix}.bed",
-        f"{plink_prefix}.bim",
-        f"{plink_prefix}.fam"
+        f"{plink_dir}/{plink_prefix_name}.bed",
+        f"{plink_dir}/{plink_prefix_name}.bim",
+        f"{plink_dir}/{plink_prefix_name}.fam"
     output:
         [f"{out_dir}/pre_qc/chr{c}_pre_qc.vcf.gz" for c in chr]
     log:
@@ -45,7 +54,7 @@ rule create_initial_input:
     shell:
         """
         bash {params.script} \
-            -p {plink_prefix} \
+            -p {plink_dir}/{plink_prefix_name} \
             -o {out_dir}/pre_qc \
             -c {code_dir} \
             -n "{chr_str}" \
@@ -67,7 +76,7 @@ rule submit_initial_input:
         """
         python {params.script} \
             --dir {out_dir}/pre_qc \
-            --chr "{chr_str}" \
+            --chr {chr_str} \
             --imp {imp} \
             --build {to_build} \
             --mode "qconly" \
@@ -90,7 +99,7 @@ rule fix_strands:
         bash {params.script} \
             -o {out_dir} \
             -c {code_dir} \
-            -n "{chr_str}" \
+            -n {chr_str} \
             -t {to_build} \
             -i {imp} \
             > {log} 2>&1
@@ -109,10 +118,10 @@ rule submit_fix_strands:
         """
         python {params.script} \
             --dir {out_dir}/post_qc \
-            --chr "{chr_str}" \
+            --chr {chr_str} \
             --imp {imp} \
             --build {to_build} \
-            --mode "imputation" \
+            --mode imputation \
             --rsq-filt {imp_rsq_filt} \
             --imp-name {imp_name} \
             > {log} 2>&1
@@ -136,7 +145,7 @@ rule unzip_results:
         """
         bash {params.script} \
             -d {out_dir}/imputed \
-            -p "{zip_pw}" \
+            -p {zip_pw} \
             -c {wildcards.chr} \
             > {log} 2>&1
         """
@@ -163,8 +172,6 @@ rule filter_info_and_vcf_files:
             -o {opt} \
            > {log} 2>&1
         """
-
-#TODO: need to add step that merges all VCFs into single PLINK file
 
 rule concat_convert_to_plink:
     input:

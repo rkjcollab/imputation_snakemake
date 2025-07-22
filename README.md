@@ -3,14 +3,16 @@
 
 * update below!
 * add instructions for making apptainer
+    *TODO: need to update apptainer to include yq, currently interactively installed:
+    * sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+    *   -O /usr/local/bin/yq &&\
+    *   sudo chmod +x /usr/local/bin/yq
+    *TODO: update container to include software needed to view DAG
 * add instructions for getting TOPMed API key and/or manual submit?
 * add note that need to lift input data over to match reference panel
     build otherwise won't be able to use fix strands code.
-* currently only implemented topmed r3, michigan 1000g phase 3 v5, michigian hla
-    four-digit multi-ethnic v1 and v2.
 * instead of step 2, could I make a script where user gives download link and 
     then auto-downloads to right spot in files?
-* update container to include software needed to view DAG
 * add checks that config values are only the allowable ones?
 * add QA/tests from CSCI6118?
 * revisit auto download before fix strands step
@@ -18,8 +20,6 @@
 * think could remove a config arg so that to_build is auto set based on chosen
     imputation
 * not sure how to better handle relative paths within the pipeline directory?
-* need a better solution for running first vs. second vs. third phase than
-    switching the until portion of the snakemake command
 
 
 ## **imputation_snakemake**

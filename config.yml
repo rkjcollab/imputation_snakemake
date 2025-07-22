@@ -1,15 +1,32 @@
-# Paths here are relative to container binding
 
-# PLINK1.9 file prefix with path
-  # must be a single file, but file can contain one or multiple chromosomes
-plink_prefix: "/data/input/daisyexome"
-out_dir: "/data"  # top-level directory for all output in container
-code_dir: "/repo"  # top-level of topmed_imputation repo in container
+# This is the only file that should be edited to run imputation using the snakemake_imputation
+# repo. A new config file should be made for each different imputation.
+
+### TODO: Update pipeline settings
+# Default filters of MAF 0 and Rsq 0.3 are applied after imputation.
 chr: [6]  # list of chromosome numbers with format [1,10,22]
 orig_build: "hg19"  #  either "hg19" or "hg38"
 to_build: "hg19"  # either "hg19" or "hg38"
 imp: "mich_hla_v2"  # should be 'topmed', 'mich_hla_v1', 'mich_hla_v2', 'mich_1kg_p3_v5', 'mich_hrc'
-imp_rsq_filt: "0.3"  # should be 0, 0.001, 0.1, 0.2, 0.3
+imp_rsq_filt: "0"  # filter to apply on imputation server (0, 0.001, 0.1, 0.2, or 0.3)
 imp_name: "snakemake_test"  # job name for imputation server
 zip_pw: ""  # add from email when imputed job finishes
 opt: "gt"  # option for "gt" only or "all" dosage information (much slower)
+
+### TODO: Update host paths outside container
+# PLINK1.9 file prefix with path - must be single file, but can contain one or more chr
+plink_prefix: "/Users/slacksa/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/DAISY/genetics/daisy_ask_genetics/daisyask_exome_array/clean/daisyexome"
+# ID list to calculate HWE filtering in (default is controls)
+id_list_hwe: "/data/TODO"
+# Top-level directory for all output
+out_dir: "/Users/slacksa/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/DAISY/genetics/daisy_ask_genetics/tm_r3_imp/hwe_in_controls"
+# Repo with snakemake pipeline
+repo: "/Users/slacksa/repos/imputation_snakemake"
+# Project-specific repo where config file saved
+proj_repo: "/Users/slacksa/repos/immuno_t1d/imputation/teddy_r01"
+
+### Container paths - should not be changed
+plink_dir_cont: "/input_data"
+out_dir_cont: "/output_data"
+repo_cont: "/repo"
+proj_repo_cont: "/proj_repo"
