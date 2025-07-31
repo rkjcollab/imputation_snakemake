@@ -22,7 +22,10 @@ def main():
     """
     args = get_args()
     if args.imp == "topmed":
-        submit_topmed(args)
+        if args.imp_job_id != "":
+            download_topmed(args)
+        else:
+            submit_topmed(args)
     elif "mich" in args.imp:
         submit_mich(args)
 
@@ -41,7 +44,7 @@ def get_args():
     parser.add_argument('--dir',
                         type=str,
                         required=True,
-                        help='Path to directory with pre_qc VFF files.')
+                        help='Path to directory with pre_qc VCF files.')
     parser.add_argument('--chr',
                         type=str,
                         required=True,
@@ -66,6 +69,10 @@ def get_args():
                         type=str,
                         required=True,
                         help="Job name for imputation server.")
+    parser.add_argument('--imp-job-id',
+                        type=str,
+                        default= '',
+                        help="Job ID after imputation (job-#####-##-###).")
 
     args = parser.parse_args()
     return args
@@ -113,6 +120,37 @@ def submit_topmed(args):
         # print message
         print(output['message'])
         print(output['id'])
+
+
+def download_topmed(args):
+    job_url = f"https://imputation.biodatacatalyst.nhlbi.nih.gov/api/v2/jobs/{args.imp_job_id}"
+    token = key.TOPMED_API
+
+    headers = {"X-Auth-Token": token}
+
+    r = requests.get(job_url, headers=headers)
+    r.raise_for_status()  # raise error if request fails
+    data = r.json()  # convert response to python data
+
+    outputs = data.get("output", [])
+    if not outputs:
+        raise ValueError("No downloadable output found.")
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    for param in outputs:
+        for file_info in param.get("files", []):
+            url = file_info["path"]
+            name = file_info["name"]
+
+            print(f"Downloading {name} from {url}")
+            resp = requests.get(url, stream=True)
+            resp.raise_for_status()
+
+            with open(os.path.join(output_dir, name), "wb") as f:
+                for chunk in resp.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
 
 
 def submit_mich(args):
