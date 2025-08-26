@@ -13,7 +13,7 @@ done
 
 
 # Make file_list for input into bcftools concat
-ls -v ${dir}/*_clean.vcf.gz > "${dir}/imputed_cleaned_file_list.txt"
+ls ${dir}/*_clean.vcf.gz | sort -V > "${dir}/imputed_cleaned_file_list.txt"
  
 # Concatenate VCFs
 bcftools concat \
