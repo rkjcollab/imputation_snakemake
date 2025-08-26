@@ -22,7 +22,10 @@ def main():
     """
     args = get_args()
     if args.imp == "topmed":
-        submit_topmed(args)
+        if args.imp_job_id != "":
+            download_topmed(args)
+        else:
+            submit_topmed(args)
     elif "mich" in args.imp:
         submit_mich(args)
 
@@ -41,7 +44,7 @@ def get_args():
     parser.add_argument('--dir',
                         type=str,
                         required=True,
-                        help='Path to directory with pre_qc VFF files.')
+                        help='Path to directory with pre_qc VCF files.')
     parser.add_argument('--chr',
                         type=str,
                         required=True,
@@ -66,6 +69,10 @@ def get_args():
                         type=str,
                         required=True,
                         help="Job name for imputation server.")
+    parser.add_argument('--imp-job-id',
+                        type=str,
+                        default= '',
+                        help="Job ID after imputation (job-#####-##-###).")
 
     args = parser.parse_args()
     return args
@@ -113,7 +120,6 @@ def submit_topmed(args):
         # print message
         print(output['message'])
         print(output['id'])
-
 
 def submit_mich(args):
     # imputation server url
