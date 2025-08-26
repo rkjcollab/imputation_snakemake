@@ -78,3 +78,5 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# imputationbot files
+imputationbot*
