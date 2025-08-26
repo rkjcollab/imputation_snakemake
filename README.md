@@ -20,6 +20,14 @@
 * think could remove a config arg so that to_build is auto set based on chosen
     imputation
 * not sure how to better handle relative paths within the pipeline directory?
+* add documentation about geno in all individuals followed by hwe in controls -
+    may lead to warning since subsetting increases variant missingness, but
+    think should be okay to ignore: https://groups.google.com/g/plink2-users/c/xjmPNfN0Swc/m/79_CAtMRBwAJ
+* better handle using imputationbot v1 for TOPmed and v2 for Michigan
+    * https://github.com/UW-GAC/primed-imputation/blob/main/register_token.sh
+* add imputationbot for download of QC only, not just for results download
+    
+    
 
 
 ## **imputation_snakemake**
