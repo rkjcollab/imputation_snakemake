@@ -3,9 +3,7 @@
 set -e
 set -u
 
-# Added getopts based on Sam's example:
-# https://github.com/pozdeyevlab/gnomad-query/blob/main/bcftools_query.sh
-while getopts p:o:c:n:b:t: opt; do
+while getopts p:o:c:n:b:t:h: opt; do
    case "${opt}" in
       p) plink_prefix=${OPTARG};;
       o) out_dir=${OPTARG};;
@@ -13,6 +11,7 @@ while getopts p:o:c:n:b:t: opt; do
       n) chr=${OPTARG};;
       b) orig_build=${OPTARG};;
       t) to_build=${OPTARG};;
+      h) hwe_filt_list=${OPTARG} ;;
       \?) echo "Invalid option -$OPTARG" >&2
       exit 1;;
    esac
@@ -42,8 +41,7 @@ orig_build_num=$(echo "$orig_build" | grep -o '[0-9]\+')
 to_build_num=$(echo "$to_build" | grep -o '[0-9]\+')
 
 if [ "$orig_build_num" != "$to_build_num" ]; then
-   echo "Lifting over"
-   #TODO: revisit and add builds to message
+   echo "Lifting over from ${orig_build_num} to ${to_build_num}"
 
    # Create bed file to crossover from hg19 to hg38 
    cat ${out_dir}/tmp_no_dupl.bim | cut -f1 | sed 's/^/chr/' > ${out_dir}/tmp_c1.txt
@@ -91,7 +89,7 @@ plink2 --bfile ${out_dir}/tmp_gwas_no_AT_CG \
   --make-pgen --out ${out_dir}/tmp_gwas_no_AT_CG_chrpos_ids
 
 # Perform pre-imputation QC - remove monomorphic SNPs, SNPs with high
-# missingness, SNPs not in HWE, & then reate vcf files for uploading
+# missingness, SNPs not in HWE, & then create vcf files for uploading
 # to imputation server for QC.
 for c in "${chr[@]}"; do
    if [ "$c" == "6" ]; then
@@ -114,25 +112,50 @@ for c in "${chr[@]}"; do
          --exclude ${out_dir}/chr6_mhc_var_id_list.txt \
          --make-pgen --out ${out_dir}/tmp_non_mhc
 
-      # Apply QC
+      # Apply MAF and SNP call rate threshold QC
          plink2 --pfile ${out_dir}/tmp_mhc \
-         --maf 0.000001 --geno 0.05 --hwe 1e-20 \
-         --make-bed --out ${out_dir}/tmp_mhc_pre_qc
+         --maf 0.000001 --geno 0.05 \
+         --make-pgen --out ${out_dir}/tmp_mhc_pre_qc
 
       plink2 --pfile ${out_dir}/tmp_non_mhc \
-         --maf 0.000001 --geno 0.05 --hwe 1e-6 \
-         --make-bed --out ${out_dir}/tmp_non_mhc_pre_qc
+         --maf 0.000001 --geno 0.05 \
+         --make-pgen --out ${out_dir}/tmp_non_mhc_pre_qc
+
+      # Apply HWE filter only in given ID list
+      plink2 --pfile ${out_dir}/tmp_mhc_pre_qc \
+         --hwe 1e-20 --nonfounders --keep "$hwe_filt_list" \
+         --write-snplist --out ${out_dir}/tmp_mhc_pre_qc_hwe_list
+
+      plink2 --pfile ${out_dir}/tmp_non_mhc_pre_qc \
+         --hwe 1e-6 --nonfounders --keep "$hwe_filt_list" \
+         --write-snplist --out ${out_dir}/tmp_non_mhc_pre_qc_hwe_list
+
+      plink2 --pfile ${out_dir}/tmp_mhc_pre_qc \
+         --extract ${out_dir}/tmp_mhc_pre_qc_hwe_list.snplist \
+         --make-bed --out ${out_dir}/tmp_mhc_pre_qc_hwe
+
+      plink2 --pfile ${out_dir}/tmp_non_mhc_pre_qc \
+         --extract ${out_dir}/tmp_non_mhc_pre_qc_hwe_list.snplist \
+         --make-bed --out ${out_dir}/tmp_non_mhc_pre_qc_hwe
    
       # Merge chr6 back together
-      plink --bfile ${out_dir}/tmp_mhc_pre_qc \
-         --bmerge ${out_dir}/tmp_non_mhc_pre_qc \
+      plink --bfile ${out_dir}/tmp_mhc_pre_qc_hwe \
+         --bmerge ${out_dir}/tmp_non_mhc_pre_qc_hwe \
          --keep-allele-order --allow-no-sex \
          --make-bed --out ${out_dir}/tmp_chr6_pre_qc
    else
       echo "Processing chr$c with HWE 1e-6."
-         plink2 --pfile ${out_dir}/tmp_gwas_no_AT_CG_chrpos_ids \
-         --maf 0.000001 --geno 0.05 --hwe 0.000001 \
+      plink2 --pfile ${out_dir}/tmp_gwas_no_AT_CG_chrpos_ids \
+         --maf 0.000001 --geno 0.05 \
          --chr "$c" \
+         --make-pgen --out ${out_dir}/tmp_chr${c}_pre_qc_no_hwe
+
+      plink2 --pfile ${out_dir}/tmp_chr${c}_pre_qc_no_hwe \
+         --hwe 1e-6 --nonfounders --keep "$hwe_filt_list" \
+         --write-snplist --out ${out_dir}/tmp_chr${c}_pre_qc_hwe_list
+
+      plink2 --pfile ${out_dir}/tmp_chr${c}_pre_qc_no_hwe \
+         --extract ${out_dir}/tmp_chr${c}_pre_qc_hwe_list.snplist \
          --make-bed --out ${out_dir}/tmp_chr${c}_pre_qc
    fi
 done
@@ -196,8 +219,8 @@ echo "Final SNP nr after QC, subset to only processed chrs: $qc_snp_nr"
    
 # Report details on just chr6, if prepared
 if [[ " ${chr[@]} " =~ " 6 " ]]; then
-   qc_snp_nr_mhc=`wc -l ${out_dir}/tmp_mhc_pre_qc.bim`
-   qc_snp_nr_non_mhc=`wc -l ${out_dir}/tmp_non_mhc_pre_qc.bim` 
+   qc_snp_nr_mhc=`wc -l ${out_dir}/tmp_mhc_pre_qc_hwe.bim`
+   qc_snp_nr_non_mhc=`wc -l ${out_dir}/tmp_non_mhc_pre_qc_hwe.bim` 
    echo "Final chr6 MHC SNP nr after QC: $qc_snp_nr_mhc"
    echo "Final chr6 non-MHC SNP nr after QC: $qc_snp_nr_non_mhc"
 
