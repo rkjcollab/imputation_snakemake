@@ -1,0 +1,13 @@
+name: imputation_snakemake
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - python=3.11
+  - snakemake
+  - conda-forge::yq
+  - conda-forge::p7zip=16.02
+  - bioconda::bcftools=1.22
+  - bioconda::crossmap=0.7.3
+  - bioconda::vcftools=0.1.17
