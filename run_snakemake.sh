@@ -22,6 +22,7 @@ fi
 
 # Default args
 dry_run=0
+local=0
 n_cores=6
 
 # Parse args
@@ -43,26 +44,56 @@ else
     dry_flag=""
 fi
 
+# Get info about config file path passed in
+config_name=$(basename "$config")
+config_path=$(dirname "$config")
+
 # Get values set in config file
 plink_prefix=$(yq '.plink_prefix' "$config")
 plink_dir=$(dirname "$plink_prefix")
+id_list_hwe=$(yq '.id_list_hwe' "$config")
+id_list_hwe_dir=$(dirname "$id_list_hwe")
 out_dir=$(yq '.out_dir' "$config")
-repo=$(yq '.repo' "$config")
-proj_repo=$(yq '.proj_repo' "$config")
-
+repo=$(yq -r '.repo' "$config")
 plink_dir_cont=$(yq '.plink_dir_cont' "$config")
+id_list_hwe_dir_cont=$(yq '.id_list_hwe_dir_cont' "$config")
 out_dir_cont=$(yq '.out_dir_cont' "$config")
 repo_cont=$(yq '.repo_cont' "$config")
-proj_repo_cont=$(yq '.proj_repo_cont' "$config")
+use_cont=$(yq '.use_cont' "$config")
 
-# Run snakemake in container
-apptainer exec \
-    --writable-tmpfs \
-    --bind ${repo}:${repo_cont} \
-    --bind ${proj_repo}:${proj_repo_cont} \
-    --bind ${plink_dir}:${plink_dir_cont} \
-    --bind ${out_dir}:${out_dir_cont} \
-    ${repo}/envs/topmed_imputation.sif \
+if [ "$use_cont" = "false" ]; then
+    # Run snakemake on local machine
+    # For SDS, first do mamba activate bcftools-vcftools-osx64-crossmap
+    #TODO: automate mambe env?
     snakemake --rerun-triggers mtime --snakefile ${repo}/Snakefile \
-        --configfile "$config" \
+        --configfile ${config_path}/${config_name} \
         --cores "$n_cores" "$step" $dry_flag
+elif [ "$use_cont" = "true" ]; then
+    # Run snakemake in container (default)
+    #TODO: add this as argument option when need to unlock
+    # snakemake --cleanup-metadata /output_data/pre_qc/* \
+    # apptainer exec \
+    #     --writable-tmpfs \
+    #     --bind ${repo}:${repo_cont} \
+    #     --bind ${config_path}:/proj_repo \
+    #     --bind ${plink_dir}:${plink_dir_cont} \
+    #     --bind ${id_list_hwe_dir}:${id_list_hwe_dir_cont} \
+    #     --bind ${out_dir}:${out_dir_cont} \
+    #     ${repo}/envs/topmed_imputation.sif \
+    #     snakemake --unlock create_initial_input \
+    #     --configfile /proj_repo/${config_name}
+    apptainer exec \
+        --writable-tmpfs \
+        --bind ${repo}:${repo_cont} \
+        --bind ${config_path}:/proj_repo \
+        --bind ${plink_dir}:${plink_dir_cont} \
+        --bind ${id_list_hwe_dir}:${id_list_hwe_dir_cont} \
+        --bind ${out_dir}:${out_dir_cont} \
+        ${repo}/envs/topmed_imputation.sif \
+        snakemake --rerun-triggers mtime --snakefile ${repo}/Snakefile \
+            --configfile /proj_repo/${config_name} \
+            --cores "$n_cores" "$step" $dry_flag
+else
+    echo "Config file use_cont must be either true or false"
+    exit
+fi
