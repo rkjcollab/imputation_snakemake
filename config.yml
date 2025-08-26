@@ -1,32 +1,36 @@
+# TO NOTE: this is an example config file!
 
-# This is the only file that should be edited to run imputation using the snakemake_imputation
-# repo. A new config file should be made for each different imputation.
+# TO NOTE: this default config file can be used when need to run --unlock.
+
+# This and the config/key.py file are the only files that should be edited to
+# run imputation using the snakemake_imputation repo. A new config file should
+# be made for each different imputation.
 
 ### TODO: Update pipeline settings
 # Default filters of MAF 0 and Rsq 0.3 are applied after imputation.
-chr: [6]  # list of chromosome numbers with format [1,10,22]
+chr: [21]  # list of chromosome numbers with format [1,10,22]
 orig_build: "hg19"  #  either "hg19" or "hg38"
 to_build: "hg19"  # either "hg19" or "hg38"
 imp: "mich_hla_v2"  # should be 'topmed', 'mich_hla_v1', 'mich_hla_v2', 'mich_1kg_p3_v5', 'mich_hrc'
 imp_rsq_filt: "0"  # filter to apply on imputation server (0, 0.001, 0.1, 0.2, or 0.3)
 imp_name: "snakemake_test"  # job name for imputation server
+imp_job_id: "job-20250724-153322-136"  # should be "job-####-##-###"
 zip_pw: ""  # add from email when imputed job finishes
 opt: "gt"  # option for "gt" only or "all" dosage information (much slower)
+use_cont: true  # true to use container, false to use local machine
 
 ### TODO: Update host paths outside container
 # PLINK1.9 file prefix with path - must be single file, but can contain one or more chr
-plink_prefix: "/Users/slacksa/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/DAISY/genetics/daisy_ask_genetics/daisyask_exome_array/clean/daisyexome"
+plink_prefix: "/Users/slacksa/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/DAISY/genetics/daisy_ask_genetics/daisyask_exome_array/clean/daisyexome_study_ids"
 # ID list to calculate HWE filtering in (default is controls)
-id_list_hwe: "/data/TODO"
+id_list_hwe: "/Users/slacksa/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/DAISY/genetics/daisy_ask_genetics/tm_r3_imp/hwe_in_ctrls/crtls_id_list.txt"
 # Top-level directory for all output
-out_dir: "/Users/slacksa/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/DAISY/genetics/daisy_ask_genetics/tm_r3_imp/hwe_in_controls"
+out_dir: "/Users/slacksa/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/DAISY/genetics/daisy_ask_genetics/tm_r3_imp/hwe_in_ctrls"
 # Repo with snakemake pipeline
 repo: "/Users/slacksa/repos/imputation_snakemake"
-# Project-specific repo where config file saved
-proj_repo: "/Users/slacksa/repos/immuno_t1d/imputation/teddy_r01"
 
 ### Container paths - should not be changed
 plink_dir_cont: "/input_data"
+id_list_hwe_dir_cont: "/id_list"
 out_dir_cont: "/output_data"
 repo_cont: "/repo"
-proj_repo_cont: "/proj_repo"
