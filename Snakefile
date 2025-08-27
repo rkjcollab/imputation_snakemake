@@ -142,10 +142,11 @@ rule submit_fix_strands:
 
 rule download_results:
     output:
-        log_final=f"{out_dir}/imputed/download_results.log"
+        [f"{out_dir}/imputed/chr_{c}.zip" for c in chr]
+    log:
+        f"{out_dir}/imputed/download_results.log"
     params:
-        script=Path(code_dir, "scripts/download_results.sh"),
-        log_tmp=f"{out_dir}/imputed/tmp_download_results.log"
+        script=Path(code_dir, "scripts/download_results.sh")
     shell:
         """
         bash {params.script} \
@@ -153,9 +154,7 @@ rule download_results:
             -c {code_dir} \
             -o {out_dir}/imputed \
             -j {imp_job_id} \
-            > {params.log_tmp} 2>&1
-
-        mv {params.log_tmp} {output.log_final}
+            > {log} 2>&1
         """
 
 # Different from the other rules, this script in this rule runs once for each chr
