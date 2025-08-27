@@ -26,7 +26,7 @@ export MICH_API=$(python -c "import config.key as k; print(k.MICH_API)")
 mkdir ~/.imputationbot
 if [ "$imp" = "topmed" ]; then
     echo "Downloading imputationbot version for TOPMed."
-    curl -sL https://raw.githubusercontent.com/lukfor/imputationbot/c752684bf8edaeb115e929f98206856d6ec27ac7/install/github-downloader-v2.sh | bash
+    curl -sL https://raw.githubusercontent.com/lukfor/imputationbot/refs/heads/master/install/github-downloader.sh | bash
     printf -- "-  hostname: https://imputation.biodatacatalyst.nhlbi.nih.gov\n   token: " > ~/.imputationbot/imputationbot.instances
     echo $TOPMED_API >> ~/.imputationbot/imputationbot.instances
 else
@@ -38,6 +38,15 @@ fi
 
 # Download results
 cd "$out_dir"
-echo "Starting download."
-echo "$job_id"
-imputationbot download "$job_id"
+${code_dir}/imputationbot download "$job_id"
+
+# Move out of imputationbot-created subfolders
+mv job*/local/* .
+mv job*/logfile/* .
+mv job*/qcreport/* .
+mv job*/statisticDir/* .
+rm -r job*
+
+# Remove imputationbot installation
+rm -r ${code_dir}/imputationbot*
+rm -r ~/.imputationbot
