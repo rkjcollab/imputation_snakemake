@@ -96,6 +96,25 @@ rule submit_initial_input:
         mv {params.log_tmp} {output.log_final}
         """
 
+#TODO: this rule still needs to be tested
+rule download_qc:
+    output:
+        log_final=f"{out_dir}/pre_qc/download_qc.log"
+    params:
+        script=Path(code_dir, "scripts/download_results.sh"),
+        log_tmp=f"{out_dir}/pre_qc/tmp_download_qc.log"
+    shell:
+        """
+        bash {params.script} \
+            -i {imp} \
+            -c {code_dir} \
+            -o {out_dir}/pre_qc \
+            -j {imp_job_id} \
+            > {params.log_tmp} 2>&1
+
+        mv {params.log_tmp} {output.log_final}
+        """
+
 rule fix_strands:
     input:
         f"{out_dir}/pre_qc/snps-excluded.txt",
