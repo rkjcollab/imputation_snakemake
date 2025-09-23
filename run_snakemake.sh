@@ -65,11 +65,14 @@ id_list_hwe=$(yq '.id_list_hwe' "$config")
 id_list_hwe_dir=$(dirname "$id_list_hwe")
 out_dir=$(yq '.out_dir' "$config")
 repo=$(yq -r '.repo' "$config")
-plink_dir_cont=$(yq '.plink_dir_cont' "$config")
 id_list_hwe_dir_cont=$(yq '.id_list_hwe_dir_cont' "$config")
-out_dir_cont=$(yq '.out_dir_cont' "$config")
-repo_cont=$(yq '.repo_cont' "$config")
 use_cont=$(yq '.use_cont' "$config")
+
+# Container paths
+plink_dir_cont="/input_data"
+id_list_hwe_dir_cont="/id_list"
+out_dir_cont="/output_data"
+repo_cont="/repo"
 
 if [ "$use_cont" = "false" ]; then
     # Run snakemake on local machine using provided conda environment
@@ -80,11 +83,11 @@ elif [ "$use_cont" = "true" ]; then
     # Run snakemake in container (default)
     apptainer exec \
         --writable-tmpfs \
-        --bind ${repo}:${repo_cont} \
-        --bind ${config_path}:/proj_repo \
-        --bind ${plink_dir}:${plink_dir_cont} \
-        --bind ${id_list_hwe_dir}:${id_list_hwe_dir_cont} \
-        --bind ${out_dir}:${out_dir_cont} \
+        --bind "${repo}:${repo_cont}" \
+        --bind "${config_path}:/proj_repo" \
+        --bind "${plink_dir}:${plink_dir_cont}" \
+        --bind "${id_list_hwe_dir}:${id_list_hwe_dir_cont}" \
+        --bind "${out_dir}:${out_dir_cont}" \
         ${repo}/envs/topmed_imputation.sif \
         snakemake --rerun-triggers mtime --snakefile ${repo}/Snakefile \
             --configfile /proj_repo/${config_name} \
