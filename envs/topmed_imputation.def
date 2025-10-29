@@ -28,7 +28,10 @@ From: python:3.11-slim-bookworm
         tabix \
         bcftools \
         vcftools \
-        p7zip-full
+        p7zip-full \
+        curl \
+        graphviz \
+	openjdk-17-jdk
 
     # CrossMap
     pip3 install --upgrade pip
