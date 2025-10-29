@@ -59,20 +59,23 @@ config_name=$(basename "$config")
 config_path=$(dirname "$config")
 
 # Get values set in config file
-plink_prefix=$(yq '.plink_prefix' "$config")
+    # Note that grep only works on simple, single-level .yml file. Using "yq"
+    # would be better, but requires tool to be available outside of container
+plink_prefix=$(sed 's/#.*//' "$config" | grep "^plink_prefix:" | cut -d':' -f2 | tr -d ' "')
 plink_dir=$(dirname "$plink_prefix")
-id_list_hwe=$(yq '.id_list_hwe' "$config")
-id_list_hwe_dir=$(dirname "$id_list_hwe")
-out_dir=$(yq '.out_dir' "$config")
-repo=$(yq -r '.repo' "$config")
-id_list_hwe_dir_cont=$(yq '.id_list_hwe_dir_cont' "$config")
-use_cont=$(yq '.use_cont' "$config")
 
-# Container paths
-plink_dir_cont="/input_data"
-id_list_hwe_dir_cont="/id_list"
-out_dir_cont="/output_data"
-repo_cont="/repo"
+id_list_hwe=$(sed 's/#.*//' "$config" | grep "^id_list_hwe:" | cut -d':' -f2 | tr -d ' "')
+id_list_hwe_dir=$(dirname "$id_list_hwe")
+
+out_dir=$(sed 's/#.*//' "$config" | grep "^out_dir:" | cut -d':' -f2 | tr -d ' "')
+repo=$(sed 's/#.*//' "$config" | grep "^repo:" | cut -d':' -f2 | tr -d ' "')
+use_cont=$(sed 's/#.*//' "$config" | grep "^use_cont:" | cut -d':' -f2 | tr -d ' "')
+
+# Get container paths set in config file - should not change
+plink_dir_cont=$(sed 's/#.*//' "$config" | grep "^plink_dir_cont:" | cut -d':' -f2 | tr -d ' "')
+id_list_hwe_dir_cont=$(sed 's/#.*//' "$config" | grep "^id_list_hwe_dir_cont:" | cut -d':' -f2 | tr -d ' "')
+out_dir_cont=$(sed 's/#.*//' "$config" | grep "^out_dir_cont:" | cut -d':' -f2 | tr -d ' "')
+repo_cont=$(sed 's/#.*//' "$config" | grep "^repo_cont:" | cut -d':' -f2 | tr -d ' "')
 
 if [ "$use_cont" = "false" ]; then
     # Run snakemake on local machine using provided conda environment
@@ -84,14 +87,15 @@ elif [ "$use_cont" = "true" ]; then
     apptainer exec \
         --writable-tmpfs \
         --bind "${repo}:${repo_cont}" \
-        --bind "${config_path}:/proj_repo" \
         --bind "${plink_dir}:${plink_dir_cont}" \
         --bind "${id_list_hwe_dir}:${id_list_hwe_dir_cont}" \
+        --bind "${config_path}:/proj_repo" \
         --bind "${out_dir}:${out_dir_cont}" \
         ${repo}/envs/topmed_imputation.sif \
         snakemake --rerun-triggers mtime --snakefile ${repo}/Snakefile \
             --configfile /proj_repo/${config_name} \
             --cores "$n_cores" "$step" $dry_flag $unlock_flag
+
 else
     echo "Config file use_cont must be either true or false"
     exit

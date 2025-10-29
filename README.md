@@ -1,13 +1,6 @@
-
 ## TODOs
 
 * update below!
-* add instructions for making apptainer
-    *TODO: need to update apptainer to include yq, currently interactively installed:
-    * sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-    *   -O /usr/local/bin/yq &&\
-    *   sudo chmod +x /usr/local/bin/yq
-    *TODO: update container to include software needed to view DAG
 * add instructions for getting TOPMed API key and/or manual submit?
 * add note that need to lift input data over to match reference panel
     build otherwise won't be able to use fix strands code.
@@ -21,7 +14,6 @@
     think should be okay to ignore: https://groups.google.com/g/plink2-users/c/xjmPNfN0Swc/m/79_CAtMRBwAJ
 * better handle using imputationbot v1 for TOPmed and v2 for Michigan
     * https://github.com/UW-GAC/primed-imputation/blob/main/register_token.sh
-* fix run_smakemake.sh when using container - yq is used before container is called...
     
     
 
@@ -38,7 +30,13 @@ Adapted from Michelle Daya's topmed_imputation pipeline.
 
 ### Apptainer
 
-TODO: add directions to build from the envs/topmed_imputation.def
+To build apptainer on an x86_64 operating system, from the top level of this
+repository run:
+
+``` 
+apptainer build envs/topmed_imputation.sif envs/topmed_imputation.def
+
+```
 
 ### Conda Environment
 
