@@ -82,6 +82,14 @@ repo: "/Users/slacksa/repos/imputation_snakemake"
 Note that some variables (imp_job_id & zip_pw) will need to be added to the config file as
 the pipeline is run.
 
+Note that imp_rsq_filt refers to a filter based on imputation quality Rsq that would be
+applied by the imputation server. To preserve information about all variants the server
+attempted to impute, it is best to set this to 0. If necessary, due to large file size,
+a filter can be applied on the server by setting this option. However, although the server
+generally returns TYPED input variants, it does almost attempt to impute them and applying
+the server-side Rsq filter appears to removed TYPED variants that imputed with an Rsq
+less than the filter as of 10/29/25.
+
 Note that for TOPMed imputation, the 'population' option is set to 'all', which means allele
 frequencies will be compared between the input data and the TOPMed panel to generate a QC
 report. For Michigan imputation, the 'population' option is set to 'off', since (at least
