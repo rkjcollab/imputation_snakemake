@@ -16,6 +16,18 @@
     * https://github.com/UW-GAC/primed-imputation/blob/main/register_token.sh
     
     
+## TODOs - after 10/29/25
+* add R argparse to mamba env and container
+* discuss sex chromosome options, note that SEX column in PLINK file must be filled out
+* add PLINK2 to conda recipe - but needs to be OSX64 or linux?
+* TODO in future - convert this to Nextflow?
+* awknowledge that better than duplicate removal would be to consider fixin mismapped
+    SNPs using reference panel... potential future step
+* add note that create initial input should be run twice so that plot with sex checks
+    can be examined and thresholds can be adjusted
+* better initial variant number logging when not running all chr?
+* get job-id from log files
+* update create_initial_input log file to count all non-chr6 HWE (vs all chr HWE)
 
 
 ## **imputation_snakemake**

@@ -7,7 +7,7 @@ set -u
 usage() {
     echo "Usage: $0 -s <step> -f <config> [-d <dry-run>] [-c <cores>] [-u <unlock>] [-h]"
     echo "Options:"
-    echo "  -s  Step to run (required): submit_initial_input, submit_fix_strands, unzip_results, or filter_info_and_vcf_files"
+    echo "  -s  Step to run (required): submit_initial_input, submit_fix_strands, or filter_info_and_vcf_files"
     echo "  -f  Path to config file"
     echo "  -d  Run snakemake --dry-run"
     echo "  -c  Number of cores to use (default: 6)"
@@ -23,7 +23,6 @@ fi
 
 # Default args
 dry_run=0
-local=0
 n_cores=6
 unlock=0
 

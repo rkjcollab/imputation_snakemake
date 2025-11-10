@@ -18,10 +18,10 @@ get_strand_flip_snp_names <- function(pre_qc_dir, post_qc_dir, imp_server) {
   
   # Add column with chr:pos for all variants
   if (imp_server == "topmed") {
-    snp.excl$chr <- as.numeric(
-      gsub("chr", "", unlist(strsplit(snp.excl$X.Position, split=":"))[seq(1,dim(snp.excl)[1]*4,4)]))
-    snp.excl$pos <- as.numeric(
-      unlist(strsplit(snp.excl$X.Position, split=":"))[seq(2,dim(snp.excl)[1]*4,4)])
+    snp.excl$chr <- 
+      gsub("chr", "", unlist(strsplit(snp.excl$X.Position, split=":"))[seq(1,dim(snp.excl)[1]*4,4)])
+    snp.excl$pos <-
+      unlist(strsplit(snp.excl$X.Position, split=":"))[seq(2,dim(snp.excl)[1]*4,4)]
     snp.excl$chr.pos <- paste0(snp.excl$chr, ":", snp.excl$pos)
   } else if (grepl("mich", imp_server)) {
     snp.excl$chr.pos <- paste0(snp.excl$CHROM, ":", snp.excl$POS)
